@@ -177,7 +177,7 @@ export default function TampilanRekap() {
                                 />
                             </div>
                         </Kartu>
-                        <Kartu judul="Jasa terlaris" rapat>
+                        <Kartu judul="Jasa terlaris" rapat className="lg:col-span-2">
                             <div className="p-4 sm:p-5">
                                 <Tabel
                                     keterangan="Jasa terlaris"
@@ -189,7 +189,7 @@ export default function TampilanRekap() {
                                 />
                             </div>
                         </Kartu>
-                        <Kartu judul="Sparepart terlaris" rapat>
+                        <Kartu judul="Sparepart terlaris" rapat className="lg:col-span-2">
                             <div className="p-4 sm:p-5">
                                 <Tabel
                                     keterangan="Sparepart terlaris"
