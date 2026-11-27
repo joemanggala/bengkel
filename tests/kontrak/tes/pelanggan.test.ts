@@ -158,7 +158,8 @@ describe('POST /api/customers: field lain', () => {
   });
 
   it.each([
-    ['badan kosong', {}, { name: 'required', phone: 'required' }],
+    // null = badan {} apa adanya, tanpa digabung dengan nama dan nomor sah di bawah.
+    ['badan kosong', null, { name: 'required', phone: 'required' }],
     ['name null', { name: null }, { name: 'required' }],
     ['name hanya spasi', { name: ' \t\r\n ' }, { name: 'required' }],
     ['name satu huruf sesudah dipangkas', { name: '  a  ' }, { name: 'too_short' }],
@@ -174,7 +175,8 @@ describe('POST /api/customers: field lain', () => {
   ])('%s → 422 tanpa membuat pelanggan', async (_judul, ubah, fields) => {
     const sebelum = await jumlahBaris('customers');
 
-    harapGalat(await buat({ name: 'Budi Santoso', phone: nomorUnik(), ...ubah }), 422, 'validation_failed', fields);
+    const badan = ubah === null ? {} : { name: 'Budi Santoso', phone: nomorUnik(), ...ubah };
+    harapGalat(await buat(badan), 422, 'validation_failed', fields);
     expect(await jumlahBaris('customers')).toBe(sebelum);
   });
 });

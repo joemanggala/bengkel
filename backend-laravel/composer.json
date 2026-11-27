@@ -1,0 +1,45 @@
+{
+    "name": "bengkel/backend-laravel",
+    "type": "project",
+    "description": "Backend Laravel aplikasi bengkel: website booking, SPK servis, kasir, dan stok sparepart, perilakunya identik dengan backend Go dan NestJS.",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4",
+        "guzzlehttp/guzzle": "8.2.0",
+        "laravel/framework": "13.36.0"
+    },
+    "require-dev": {
+        "laravel/pint": "1.32.1",
+        "phpunit/phpunit": "13.3.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan bengkel:serve"
+        ],
+        "test": "@php vendor/bin/phpunit",
+        "format": "@php vendor/bin/pint",
+        "format-check": "@php vendor/bin/pint --test"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

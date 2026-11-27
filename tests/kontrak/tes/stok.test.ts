@@ -303,7 +303,7 @@ describe('pencatatan stok: peran dan urutan pemeriksaan', () => {
     expect((await barisPart(p.partId)).stock).toBe(10);
     // Dibandingkan sebagai himpunan: urutan waktu bisa kembar pada milidetik yang sama.
     const kartu = (await barisKartuStok(p.partId)).map((k) => `${k.type} ${k.quantity} → ${k.stock_after}`);
-    expect(kartu.sort()).toEqual(['COUNT -8 → 7', 'IN 10 → 10', 'IN 3 → 10', 'IN 5 → 15', 'OUT -12 → 3'].sort());
+    expect(kartu.sort()).toEqual(['COUNT 4 → 7', 'IN 10 → 10', 'IN 3 → 10', 'IN 5 → 15', 'OUT -12 → 3'].sort());
     expect(await sparepartTidakCocokKartu()).toEqual([]);
   });
 });

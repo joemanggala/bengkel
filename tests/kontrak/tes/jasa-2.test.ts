@@ -32,8 +32,9 @@ let pemilik: SesiStaf;
 let kasir: SesiStaf;
 let mekanik: SesiStaf;
 
-function ubah(serviceId: string, json: unknown, token: string | undefined = pemilik.token): Promise<Respons> {
-  return api.patch(`/api/services/${serviceId}`, { token, json });
+// token null = tanpa token. Bukan undefined: undefined memicu nilai bawaan parameter.
+function ubah(serviceId: string, json: unknown, token: string | null = pemilik.token): Promise<Respons> {
+  return api.patch(`/api/services/${serviceId}`, { token: token ?? undefined, json });
 }
 
 async function jasaApi(serviceId: string): Promise<any> {
@@ -191,7 +192,7 @@ describe('PATCH /api/services/{serviceId}', () => {
     harapGalat(await api.patch(path, { token: pemilik.token, mentah: '[]' }), 400, 'bad_request');
     harapGalat(await api.patch(path, { token: pemilik.token, mentah: '' }), 400, 'bad_request');
     harapGalat(await api.patch(path, { token: pemilik.token, biner: badanUtf8Rusak() }), 400, 'bad_request');
-    harapGalat(await ubah(id, {}, undefined), 401, 'unauthenticated');
+    harapGalat(await ubah(id, {}, null), 401, 'unauthenticated');
     harapGalat(await ubah(id, {}, tokenAcak()), 401, 'unauthenticated');
     harapGalat(await ubah(id, {}, mekanik.token), 403, 'forbidden');
     harapGalat(await ubah(id, {}), 404, 'not_found');

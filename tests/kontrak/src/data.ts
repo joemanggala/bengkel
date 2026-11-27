@@ -333,7 +333,7 @@ export async function siapkanBengkel(): Promise<Bengkel> {
   const mekanik = await buatMekanik();
   const gantiOli = await buatJasa(pemilik.token, { name: namaUnik('Ganti Oli'), price: 35000, durationMinutes: 30 });
   const cekKelistrikan = await buatJasaNonPublik(pemilik.token, { name: namaUnik('Cek Kelistrikan'), price: 50000 });
-  const oli = await buatPart(pemilik.token, { name: 'Oli Mesin 10W-40 0,8 L', unit: 'botol', price: 55000, costPrice: 40000, initialStock: 20 });
+  const oli = await buatPart(pemilik.token, { name: 'Oli Mesin 10W-40 0,8 L', unit: 'botol', price: 55000, costPrice: 40000, initialStock: 500 });
   const kampas = await buatPart(pemilik.token, { name: 'Kampas Rem Depan Vario', unit: 'set', price: 75000, costPrice: 50000, initialStock: 10 });
   const { pelanggan, kendaraan } = await buatPelangganDenganKendaraan(kasir.token);
   return { pemilik, kasir, mekanik, gantiOli, cekKelistrikan, oli, kampas, pelanggan, kendaraan };

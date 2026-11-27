@@ -26,12 +26,13 @@ beforeAll(async () => {
   kasirLain = await buatKasir({ name: 'Kasir Sore' });
 });
 
-function catat(nomor: string, json: unknown, token: string | undefined = b.kasir.token): Promise<Respons> {
-  return kirimBayar(token, nomor, json);
+// token null = tanpa token. Bukan undefined: undefined memicu nilai bawaan parameter.
+function catat(nomor: string, json: unknown, token: string | null = b.kasir.token): Promise<Respons> {
+  return kirimBayar(token ?? undefined, nomor, json);
 }
 
-function catatMentah(nomor: string, mentah: string, token: string | undefined = b.kasir.token): Promise<Respons> {
-  return api.post(`/api/work-orders/${nomor}/payments`, { token, mentah });
+function catatMentah(nomor: string, mentah: string, token: string | null = b.kasir.token): Promise<Respons> {
+  return api.post(`/api/work-orders/${nomor}/payments`, { token: token ?? undefined, mentah });
 }
 
 // SPK berisi Rp90.000 di status tertentu (PICKED_UP sudah lunas).
@@ -326,9 +327,9 @@ describe('POST /api/work-orders/{number}/payments: validasi', () => {
 
 describe('POST /api/work-orders/{number}/payments: urutan 413 → 400 → 401 → 403 → 404 → 422', () => {
   it('badan lebih dari 1 MiB → 413; badan bukan objek JSON → 400; keduanya sebelum 401 dan 404', async () => {
-    harapGalat(await catatMentah('S-9999', jsonLebihDariSatuMib(), undefined), 413, 'payload_too_large');
+    harapGalat(await catatMentah('S-9999', jsonLebihDariSatuMib(), null), 413, 'payload_too_large');
     for (const mentah of [JSON_RUSAK, '[]', 'null', '"1000"', '1000', '']) {
-      harapGalat(await catatMentah('S-9999', mentah, undefined), 400, 'bad_request');
+      harapGalat(await catatMentah('S-9999', mentah, null), 400, 'bad_request');
       harapGalat(await catatMentah('S-9999', mentah, b.mekanik.token), 400, 'bad_request');
     }
   });
@@ -336,7 +337,7 @@ describe('POST /api/work-orders/{number}/payments: urutan 413 → 400 → 401 �
   it('tanpa token atau token tak dikenal → 401, sebelum 403 dan 404', async () => {
     const spk = await spkBerisi(b);
 
-    harapGalat(await catat('S-9999', { amount: 1000, method: 'cash' }, undefined), 401, 'unauthenticated');
+    harapGalat(await catat('S-9999', { amount: 1000, method: 'cash' }, null), 401, 'unauthenticated');
     harapGalat(await catat(spk.number, { amount: 1000, method: 'cash' }, 'x'.repeat(43)), 401, 'unauthenticated');
   });
 

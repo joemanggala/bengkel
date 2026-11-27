@@ -19,8 +19,9 @@ const SANDI_BARU = 'SandiBaru456!';
 
 let pemilik: SesiStaf;
 
-function ubah(staffId: string, json: unknown, token: string | undefined = pemilik.token): Promise<Respons> {
-  return api.patch(`/api/staff/${staffId}`, { token, json });
+// token null = tanpa token. Bukan undefined: undefined memicu nilai bawaan parameter.
+function ubah(staffId: string, json: unknown, token: string | null = pemilik.token): Promise<Respons> {
+  return api.patch(`/api/staff/${staffId}`, { token: token ?? undefined, json });
 }
 
 async function stafApi(staffId: string): Promise<any> {
@@ -277,7 +278,7 @@ describe('PATCH /api/staff/{staffId}: validasi dan urutan', () => {
     harapGalat(await api.patch(`/api/staff/${id}`, { token: pemilik.token, mentah: '[]' }), 400, 'bad_request');
     harapGalat(await api.patch(`/api/staff/${pemilik.staff.staffId}`, { token: pemilik.token, mentah: 'null' }), 400, 'bad_request');
     harapGalat(await api.patch(`/api/staff/${id}`, { token: pemilik.token, biner: badanUtf8Rusak() }), 400, 'bad_request');
-    harapGalat(await ubah(id, {}, undefined), 401, 'unauthenticated');
+    harapGalat(await ubah(id, {}, null), 401, 'unauthenticated');
     harapGalat(await ubah(id, {}, tokenAcak()), 401, 'unauthenticated');
     harapGalat(await ubah(id, {}, kasir.token), 403, 'forbidden');
     harapGalat(await ubah(id, {}), 404, 'not_found');
