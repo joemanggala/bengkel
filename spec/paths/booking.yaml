@@ -1,0 +1,291 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+bookings:
+  get:
+    operationId: daftarBooking
+    tags: [Booking]
+    summary: Daftar booking masuk
+    description: |
+      Pemilik dan kasir (mekanik → 403). Urutan pemeriksaan: 401 → 403 → 422
+      (query) → 200. Semua filter bisa digabung. Urut `created_at` terbaru
+      dulu, lalu `booking_id` turun.
+
+      `search` mencocokkan **nomor booking**, **nama pemesan**, **nomor HP**,
+      atau **plat** (aturan cocok di parameter `search`).
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/StatusBookingQuery'
+      - $ref: '../components/parameters/umum.yaml#/TanggalDatangQuery'
+      - $ref: '../components/parameters/umum.yaml#/Search'
+      - $ref: '../components/parameters/umum.yaml#/Page'
+      - $ref: '../components/parameters/umum.yaml#/Limit'
+    responses:
+      '200':
+        description: Satu halaman booking.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/booking.yaml#/Booking'
+                meta:
+                  $ref: '../components/schemas/umum.yaml#/Meta'
+            examples:
+              daftar:
+                $ref: '../components/examples/contoh.yaml#/DaftarBooking'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+booking:
+  get:
+    operationId: detailBooking
+    tags: [Booking]
+    summary: Rincian satu booking
+    description: Pemilik dan kasir. Urutan 401 → 403 → 404 → 200.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/BookingId'
+    responses:
+      '200':
+        description: Booking.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/booking.yaml#/Booking'
+            examples:
+              menunggu:
+                $ref: '../components/examples/contoh.yaml#/Booking'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+confirm:
+  post:
+    operationId: konfirmasiBooking
+    tags: [Booking]
+    summary: Mengonfirmasi booking yang menunggu
+    description: |
+      Pemilik dan kasir. Tanpa badan (badan diabaikan). Urutan: 401 → 403 →
+      404 → 409 `booking_transition_invalid` (status bukan `PENDING`) → 200
+      dengan booking sesudah dikonfirmasi.
+
+      Berhasil: status `CONFIRMED` dan `handledBy` = staf yang masuk, dalam
+      satu transaksi yang mengunci baris booking. Dua konfirmasi serentak →
+      satu 200 dan satu 409. **Sesudah commit**, pesan WhatsApp
+      `booking_confirmed` dikirim ke nomor booking dan dicatat
+      (`whatsapp.md`). Gagal kirim tidak menggagalkan permintaan; balasan
+      tetap 200 dengan `wa.bookingConfirmed.status` `failed`.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/BookingId'
+    responses:
+      '200':
+        description: Booking dikonfirmasi.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/booking.yaml#/Booking'
+            examples:
+              dikonfirmasi:
+                $ref: '../components/examples/contoh.yaml#/BookingDikonfirmasi'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`booking_transition_invalid`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              transisi:
+                $ref: '../components/examples/contoh.yaml#/GalatBookingTransisi'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+reject:
+  post:
+    operationId: tolakBooking
+    tags: [Booking]
+    summary: Menolak booking dengan alasan
+    description: |
+      Pemilik dan kasir. Urutan: 413 → 400 → 401 → 403 → 404 → 422
+      (`reason`) → 409 `booking_transition_invalid` (status bukan `PENDING`
+      atau `CONFIRMED`) → 200 dengan booking sesudah ditolak.
+
+      Berhasil: status `REJECTED`, `rejectReason` = alasan (dipangkas), dan
+      `handledBy` = staf yang masuk, dalam satu transaksi yang mengunci baris
+      booking. **Sesudah commit**, pesan WhatsApp `booking_rejected` yang
+      memuat alasannya dikirim dan dicatat. Gagal kirim tidak menggagalkan
+      permintaan (`wa.bookingRejected.status` `failed`).
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/BookingId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/booking.yaml#/TolakBookingRequest'
+          example:
+            reason: Bengkel tutup tanggal itu, silakan pilih tanggal lain.
+    responses:
+      '200':
+        description: Booking ditolak.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/booking.yaml#/Booking'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`booking_transition_invalid`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+convert:
+  post:
+    operationId: jadikanSpk
+    tags: [Booking]
+    summary: Menjadikan booking SPK saat pelanggan datang
+    description: |
+      Pemilik dan kasir. Badan wajib objek JSON (boleh `{}`). Urutan: 413 →
+      400 → 401 → 403 → 404 → 422 (field badan) → 409
+      `booking_transition_invalid` (status bukan `PENDING` atau
+      `CONFIRMED`) → 409 `plate_owned_by_other_customer` → 201.
+
+      Dalam **satu transaksi**, dengan urutan kunci baris booking →
+      pelanggan → kendaraan → `counters` (lihat "Permintaan serentak"):
+      1. Baris booking dikunci dan statusnya diperiksa (409).
+      2. **Pelanggan** dicari dari nomor HP booking (bentuk seragam) dengan
+         `SELECT … FOR UPDATE`. Tidak ada → pelanggan baru dibuat dengan
+         nama dan nomor dari booking (alamat dan catatan kosong). Ada →
+         dipakai apa adanya (namanya tidak ditimpa nama di booking).
+      3. **Kendaraan** dicari dari kunci plat booking. Tidak ada →
+         kendaraan baru dibuat untuk pelanggan itu (jenis, plat, merek, dan
+         tipe dari booking; tahun `null`, warna kosong). Ada dan milik
+         pelanggan itu → dipakai apa adanya. Ada tetapi milik pelanggan lain
+         → 409 `plate_owned_by_other_customer` dan **tidak ada yang
+         berubah** (pelanggan baru dari langkah 2 juga batal), supaya kasir
+         memeriksanya dulu (mis. motor sudah dijual, atau salah ketik plat).
+      4. SPK dibuat persis seperti `buatSpk` (nomor `S-…` dari `counters`,
+         status `QUEUED`, satu baris linimasa, token lacak baru) dengan
+         keluhan dari booking dan `mechanicId`, `odometer`,
+         `estimatedDoneAt` dari badan. Rujukan `mechanicId` dinilai di
+         langkah 422.
+      5. Bila booking memilih jasa **dan jasa itu masih aktif** (boleh
+         sudah tidak tampil di website), jasa itu menjadi item pertama
+         (`SERVICE`, jumlah 1, harga katalog **saat konversi**, nama saat
+         ini). Jasa yang sudah nonaktif dilewati tanpa galat.
+      6. Booking menjadi `CONVERTED`, `workOrderNumber` terisi, `handledBy`
+         = staf yang masuk.
+
+      Galat kunci ganda (errno 1062) saat membuat pelanggan atau kendaraan
+      karena permintaan lain membuatnya bersamaan → transaksi diulang dari
+      awal (dihitung ke batas 3 kali ulang yang sama dengan deadlock),
+      sehingga percobaan berikutnya menemukan baris itu.
+
+      **Sesudah commit**, pesan `work_order_created` dikirim ke nomor
+      pelanggan seperti `buatSpk`. Gagal kirim tidak menggagalkan
+      permintaan.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/BookingId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/booking.yaml#/JadikanSpkRequest'
+          example:
+            mechanicId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000003
+            odometer: 18250
+    responses:
+      '201':
+        description: Booking menjadi SPK.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/booking.yaml#/HasilJadikanSpk'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`booking_transition_invalid` atau `plate_owned_by_other_customer`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              platPelangganLain:
+                $ref: '../components/examples/contoh.yaml#/GalatPlatPelangganLain'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

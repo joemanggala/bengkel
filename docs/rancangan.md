@@ -1,6 +1,7 @@
 # Rancangan Aplikasi Bengkel
 
-Tanggal: 2026-11-27 · Status: rancangan, menunggu tinjauan pengguna.
+Tanggal: 2026-11-27 · Status: disetujui pengguna 2026-11-27 ("gas sampai selesai, yang penting
+sama dengan contoh produk yang sudah ada"); dikerjakan per bagian.
 
 Produk berikutnya di KodeCoding (setelah Laundry, Toko Online, Kafe dan Resto, dan SIAKAD).
 Pembeli mendapat source code lengkap satu varian: backend + web Next.js. Isinya: website publik
@@ -38,8 +39,8 @@ kembali saat batal).
 
 ## Keputusan yang saya ambil sendiri
 
-Menunggu persetujuan pengguna. Nomor dipertahankan supaya rujukan tidak bergeser bila ada yang
-dibuang.
+Disetujui pengguna 2026-11-27 bersama seluruh rancangan. Nomor dipertahankan supaya rujukan
+tidak bergeser bila nanti ada yang diubah.
 
 | # | Keputusan | Alasan |
 |---|---|---|
@@ -170,7 +171,7 @@ Ditolak (staf, wajib alasan) dan `CANCELLED` Dibatalkan (pelanggan, hanya dari `
 | `stock_movements` | kartu stok: part, jenis, jumlah bertanda, stok sesudah, catatan, SPK, staf |
 | `counters` | penghitung nomor SPK dan booking |
 | `bookings` | nomor, data pemesan dan kendaraan (salinan), jasa (salinan nama), tanggal datang, keluhan, status, alasan tolak, hash token booking, SPK hasil konversi |
-| `work_orders` | SPK: nomor, pelanggan, kendaraan, booking, mekanik, status, keluhan, diagnosis, odometer, estimasi selesai, subtotal jasa dan part, total, terbayar, alasan batal, hash token lacak, pembuat |
+| `work_orders` | SPK: nomor, pelanggan, kendaraan, mekanik, status, keluhan, diagnosis, odometer, estimasi selesai, subtotal jasa dan part, total, terbayar, alasan batal, token lacak (apa adanya, keputusan Bagian 0a nomor 0a-1), pembuat; booking asalnya dibaca dari `bookings` (0a-13) |
 | `work_order_items` | salinan jasa atau part: jenis, nama, harga jual, harga beli, jumlah, subtotal |
 | `work_order_status_logs` | linimasa status |
 | `payments` | jumlah, metode, pencatat, waktu |
@@ -287,6 +288,55 @@ jadikan SPK), **Pelanggan** (+ kendaraan dan riwayat servis), dan untuk pemilik:
 
 Estimasi ukuran, dari kafe-resto yang strukturnya mirip: backend 8–10 ribu baris, web ±12 ribu
 (ada website publik), tes kontrak ±5 ribu.
+
+## Keputusan Bagian 0a (2026-11-27)
+
+Celah dan kontradiksi kecil yang ditemukan saat menulis spec dan migration, diputuskan pelaksana
+Bagian 0a dengan memilih yang paling konsisten dengan kafe-resto dan laundry. Rinciannya di
+`spec/openapi.yaml` dan `spec/whatsapp.md`.
+
+Ditinjau koordinator 2026-11-27 dan **diterima seluruhnya**, termasuk 0a-1 (menyimpang dari
+"hanya hash" di rancangan awal; presedennya `qr_token` kafe-resto) dan 0a-9. Pesan WhatsApp
+booking yang gagal kirim sengaja tidak punya rute kirim ulang: staf menghubungi pelanggan
+sendiri, supaya form publik tidak bisa dipakai memicu pesan berulang.
+
+| # | Keputusan | Alasan |
+|---|---|---|
+| 0a-1 | **Token lacak SPK disimpan apa adanya** (`work_orders.tracking_token`), bukan hash; token booking tetap hanya hash. Rincian SPK untuk staf memuat `trackingToken` | Rancangan meminta pesan "siap diambil" (dikirim saat `DONE`, jauh sesudah SPK dibuat), nota, dan kirim ulang memuat tautan `/servis/{token}`; dengan hash saja tautan itu mustahil dirangkai. Polanya sama dengan `qr_token` meja di kafe-resto yang disimpan apa adanya karena harus dicetak ulang. Membuat ulang tautan tetap mematikan token lama |
+| 0a-2 | Rute tambahan **`GET /api/mechanics`** (pemilik, kasir): mekanik aktif `{staffId, name}` | Kasir menugaskan mekanik, tetapi `GET /api/staff` khusus pemilik. Jadi 52 operasi |
+| 0a-3 | Tabel **`login_attempts`** ikut di `000001_awal` (16 tabel) | Batas 10 percobaan masuk sama dengan kafe-resto; backend PHP-FPM butuh tabel (di kafe-resto ditambahkan belakangan di `000005`) |
+| 0a-4 | `DONE` hanya bila SPK punya minimal satu item (409 `work_order_empty`); `WAITING_PARTS` tidak bisa langsung `DONE` | Pesanan dan nota di produk lain selalu punya item; pesan "siap diambil" dengan total Rp0 membingungkan pelanggan |
+| 0a-5 | `PATCH` SPK dan item hanya selama `QUEUED`/`IN_PROGRESS`/`WAITING_PARTS` (409 `work_order_locked`); mekanik hanya boleh mengirim `diagnosis` (kunci lain 403) | Nilai SPK dan mekaniknya tetap sejak `DONE`, jadi rekap tidak berubah sesudah hari lewat |
+| 0a-6 | Mekanik yang membuka SPK bukan miliknya → **403** (rincian, `PATCH`, `status`), dinilai sesudah 404; daftar SPK otomatis tersaring | Rancangan menulis 403 untuk status; disamakan untuk semua rute SPK supaya satu aturan |
+| 0a-7 | Menghapus item yang membuat total di bawah yang sudah dibayar → 409 `total_below_paid` | Uang muka boleh sejak SPK dibuat; tanpa aturan ini `paidAmount > total` (dijaga `CHECK`) |
+| 0a-8 | Pembayaran SPK batal → 409 `work_order_cancelled`, SPK sudah diambil → 409 `already_picked_up`; kirim ulang `work_order_done` sebelum `DONE` → 409 `work_order_not_done` | Rancangan hanya menulis "409"; kode dipisah seperti `order_cancelled`/`order_not_ready` di kafe-resto |
+| 0a-9 | **Nilai, modal, laba, dan terlaris di rekap dihitung dari SPK yang `DONE` pada tanggal itu**; "SPK masuk" dari tanggal dibuat (bukan batal); uang diterima dari tanggal pembayaran | SPK bengkel bisa berhari-hari dan item baru final saat `DONE`; dengan tanggal dibuat (cara kafe-resto) angka hari lampau berubah setiap ada item baru |
+| 0a-10 | Booking: `REJECTED` boleh dari `PENDING` atau `CONFIRMED`; jasa booking yang tidak `isPublic` dianggap tidak ada (`unknown_reference`); konversi memakai pelanggan yang sudah ada tanpa menimpa namanya; jasa booking yang sudah nonaktif dilewati tanpa galat | Rancangan tidak menyebut asal status tolak; sisanya mengikuti "jangan mengubah data diam-diam" |
+| 0a-11 | Pesan WhatsApp booking **tidak memuat nama, merek, maupun keluhan ketikan pemesan**, hanya nomor booking, plat, tanggal, nama jasa, dan teks bengkel; pesan SPK memuat nama pelanggan | Nomor di form publik tidak diverifikasi (seperti pesan "siap" kafe-resto yang tanpa nama); data SPK dicatat kasir di depan pelanggan |
+| 0a-12 | Plat yang tidak mengikuti pola huruf-angka-huruf ditampilkan sama dengan kuncinya (huruf besar tanpa spasi) | Satu bentuk yang pasti untuk tiga backend; tidak menyimpan spasi ketikan |
+| 0a-13 | `work_orders` tidak menyimpan `booking_id`; asal booking dibaca dari `bookings.work_order_id` (unik, terisi tepat saat `CONVERTED`, dijaga `CHECK`). Kendaraan SPK dijaga FOREIGN KEY gabungan (kendaraan, pelanggan) | Menghindari FOREIGN KEY melingkar dan dua kolom yang bisa saling bertentangan |
+| 0a-14 | Status bayar SPK bertotal 0 = `paid` (rumus kafe-resto: lunas bila terbayar = total); SPK bertotal 0 boleh langsung diambil | Satu rumus untuk semua backend; web bisa menyembunyikan lencana bayar selama belum ada item |
+
+## Yang sudah terverifikasi di Bagian 0a
+
+- Migration naik, turun (`down -all`), dan naik lagi dengan bersih di `bengkel_uji` (MySQL
+  8.4.10, golang-migrate 4.20.1): 16 tabel ditambah `schema_migrations`, baris `outlet` "Nama
+  Bengkel" dan dua baris `counters`.
+- 87 pelanggaran aturan bisnis ditolak database oleh constraint yang dimaksud (CHECK, UNIQUE,
+  dan FOREIGN KEY, termasuk kendaraan milik pelanggan lain di SPK, stok negatif, diambil sebelum
+  lunas, transisi linimasa yang tidak sah, dan pesan WhatsApp yang menunjuk rujukan yang salah);
+  34 data sah lolos. Semua dijalankan dalam satu transaksi lalu dibatalkan.
+- Spec lolos `redocly lint` 1.34.20 dengan 0 galat dan 0 peringatan, termasuk semua contoh di
+  spec yang diperiksa terhadap skemanya; 52 operasi, `operationId` unik.
+- 21 contoh respons sah lolos skema dan 40 contoh salah ditolak (ajv 8, JSON Schema 2020-12),
+  antara lain `costPrice` bocor ke kasir, daftar part campuran, nomor HP utuh atau tersamar
+  salah di respons publik, nama mekanik, diagnosis, token, dan catatan linimasa di halaman
+  lacak, `costPrice` di item SPK, token publik 42/44 karakter atau berpadding, hash token dan
+  hash sandi yang bocor, dan `fields` di galat selain `validation_failed`.
+- 22 contoh normalisasi plat, nomor HP, dan penyamaran HP yang ditulis di spec dicek dengan
+  skrip.
+- Dokumentasi Fonnte dibaca ulang pada 2026-11-27 dan cocok dengan `spec/whatsapp.md` (sama
+  dengan catatan kafe-resto 2026-11-04).
 
 ## Risiko dan hal yang belum pasti
 

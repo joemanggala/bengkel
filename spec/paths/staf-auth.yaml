@@ -1,0 +1,128 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+login:
+  post:
+    operationId: masukStaf
+    tags: [Staf]
+    summary: Pemilik, kasir, atau mekanik masuk dengan email dan sandi
+    description: |
+      Publik. Dipakai web. Tanpa OTP.
+
+      Urutan pemeriksaan:
+      1. 413 `payload_too_large` → 400 `bad_request`.
+      2. `email` atau `password` tidak dikirim, `null`, atau kosong → 422
+         `required`; bukan string → `invalid_type`.
+      3. Email yang sama (dipangkas, A-Z dikecilkan) sudah dicoba masuk 10 kali
+         berturut-turut tanpa berhasil → 429 `too_many_requests` dengan
+         `Retry-After` (detik, 1–900), tanpa memeriksa sandi: sandi yang benar
+         pun ditolak selama dikunci. Percobaan dihitung sebelum sandi diperiksa
+         (permintaan serentak tetap hanya mendapat 10 kesempatan), dihitung juga
+         untuk email yang tidak terdaftar, dan kuncinya 15 menit sejak
+         percobaan ke-10. Login yang berhasil menghapus hitungannya; email
+         lain tidak terpengaruh. Backend yang berjalan sebagai banyak proses
+         (PHP-FPM) menyimpan hitungan di tabel `login_attempts`; backend satu
+         proses boleh menyimpannya di memori.
+      4. Email (dipangkas, A-Z dikecilkan) tidak dikenal, sandi salah, atau
+         staf nonaktif → 401 `invalid_credentials` dengan badan yang sama
+         persis. Email yang memuat karakter non-ASCII pasti tidak terdaftar;
+         backend langsung membalas 401 tanpa bertanya ke database.
+      5. Sesi staf baru dibuat → 200.
+
+      Sesi: lihat "Peran dan sesi" di deskripsi API (30 hari, bergeser). Sesi
+      lain milik staf yang sama tetap berlaku.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/staf.yaml#/MasukStafRequest'
+          example:
+            email: pemilik@contoh.id
+            password: sandi-rahasia-123
+    responses:
+      '200':
+        description: Masuk berhasil.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/staf.yaml#/AuthStaf'
+            examples:
+              berhasil:
+                $ref: '../components/examples/contoh.yaml#/AuthStaf'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        description: '`invalid_credentials`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: invalid_credentials
+                message: Email atau kata sandi salah
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '429':
+        $ref: '../components/responses/galat.yaml#/TooManyLoginAttempts'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+logout:
+  post:
+    operationId: keluarStaf
+    tags: [Staf]
+    summary: Staf keluar dari sesi ini
+    description: |
+      Semua peran. Tanpa badan. Menghapus baris `staff_sessions` milik token
+      yang dipakai. Sesi lain milik staf yang sama tidak terpengaruh.
+      Setelahnya token itu ditolak 401.
+    security:
+      - tokenStaf: []
+    responses:
+      '204':
+        description: Sesi dihapus.
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+me:
+  get:
+    operationId: stafSaya
+    tags: [Staf]
+    summary: Profil staf yang sedang masuk
+    description: |
+      Semua peran. Membalas profil beserta `role`, yang dibaca dari database
+      pada setiap permintaan (perubahan peran oleh pemilik langsung berlaku
+      tanpa masuk ulang). Web memakai `role` untuk memilih menu.
+    security:
+      - tokenStaf: []
+    responses:
+      '200':
+        description: Profil.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/staf.yaml#/Staf'
+            examples:
+              pemilik:
+                $ref: '../components/examples/contoh.yaml#/StafPemilik'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

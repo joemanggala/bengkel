@@ -1,0 +1,222 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+workOrders:
+  get:
+    operationId: daftarSpk
+    tags: [SPK]
+    summary: Daftar SPK untuk papan servis
+    description: |
+      Semua peran staf. **Mekanik hanya menerima SPK yang ditugaskan
+      kepadanya** (`mechanicId` di query diabaikan untuknya); pemilik dan
+      kasir menerima semua. Urutan pemeriksaan: 401 → 422 (query) → 200.
+      Semua filter bisa digabung. Urutan bawaan `created_at` terbaru dulu,
+      lalu `work_order_id` turun; `sort=oldest` membaliknya.
+
+      `search` mencocokkan **nomor SPK**, **plat**, **nama pelanggan**, atau
+      **nomor HP pelanggan** (data pelanggan dan kendaraan saat ini; aturan
+      cocok di parameter `search`).
+
+      Papan servis memuat ulang daftar ini berkala (polling, tanpa
+      WebSocket); `updatedAt` tiap baris berubah setiap kali SPK berubah.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/StatusSpkQuery'
+      - $ref: '../components/parameters/umum.yaml#/LingkupSpk'
+      - $ref: '../components/parameters/umum.yaml#/MechanicIdQuery'
+      - $ref: '../components/parameters/umum.yaml#/TanggalFilter'
+      - $ref: '../components/parameters/umum.yaml#/UrutanSpk'
+      - $ref: '../components/parameters/umum.yaml#/Search'
+      - $ref: '../components/parameters/umum.yaml#/Page'
+      - $ref: '../components/parameters/umum.yaml#/Limit'
+    responses:
+      '200':
+        description: Satu halaman SPK.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/spk.yaml#/SpkRingkas'
+                meta:
+                  $ref: '../components/schemas/umum.yaml#/Meta'
+            examples:
+              papan:
+                $ref: '../components/examples/contoh.yaml#/DaftarSpk'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+  post:
+    operationId: buatSpk
+    tags: [SPK]
+    summary: Kasir membuat SPK untuk pelanggan yang datang langsung
+    description: |
+      Pemilik dan kasir (mekanik → 403). Urutan: 413 → 400 → 401 → 403 →
+      422 → 201.
+
+      Setelah validasi lolos, dalam **satu transaksi**:
+      1. Baris `counters` `work_order_number` dikunci dan dinaikkan satu.
+         Nomor SPK = `S-` + nilai itu, diisi nol di depan sampai minimal 4
+         digit: `S-0001`, `S-0042`, `S-9999`, `S-10000`. SPK yang dibuat
+         bersamaan selalu mendapat nomor yang berbeda dan berurutan tanpa
+         celah. Nomor tidak pernah direset per hari.
+      2. SPK disimpan: pelanggan = pemilik kendaraan, status `QUEUED`,
+         semua subtotal dan `paidAmount` 0, `diagnosis` kosong, pembuat =
+         staf yang masuk, dan satu baris linimasa (`null` → `QUEUED`,
+         staf yang masuk, catatan kosong).
+      3. Token lacak 32 byte acak kriptografis dibuat (base64url tanpa
+         padding, 43 karakter) dan disimpan apa adanya di
+         `work_orders.tracking_token`.
+
+      SPK baru belum punya item; item ditambahkan lewat
+      `POST /api/work-orders/{number}/items`. **Sesudah commit**, pesan
+      `work_order_created` (memuat tautan `/servis/{trackingToken}`) dikirim
+      ke nomor pelanggan dan dicatat. Gagal kirim tidak menggagalkan
+      permintaan: balasan tetap 201 dengan `wa.workOrderCreated.status`
+      `failed`, dan kasir bisa mengirim ulang.
+    security:
+      - tokenStaf: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/spk.yaml#/BuatSpkRequest'
+          example:
+            vehicleId: 2d2d2d2d-0000-4000-8000-000000000001
+            complaint: Servis rutin 2.000 km.
+    responses:
+      '201':
+        description: SPK dibuat, termasuk `trackingToken`.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+            examples:
+              baru:
+                $ref: '../components/examples/contoh.yaml#/SpkBaru'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+workOrder:
+  get:
+    operationId: detailSpk
+    tags: [SPK]
+    summary: Rincian SPK beserta item, pembayaran, linimasa, dan status WhatsApp
+    description: |
+      Semua peran staf. Urutan: 401 → 404 → 403 (peminta mekanik dan SPK
+      ini tidak ditugaskan kepadanya, termasuk SPK tanpa mekanik) → 200.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/NomorSpkPath'
+    responses:
+      '200':
+        description: Rincian SPK.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+            examples:
+              dikerjakan:
+                $ref: '../components/examples/contoh.yaml#/SpkDetail'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+  patch:
+    operationId: ubahSpk
+    tags: [SPK]
+    summary: Mengubah mekanik, keluhan, odometer, estimasi, atau diagnosis
+    description: |
+      Semua peran staf, dengan batas untuk mekanik. Urutan: 413 → 400 → 401
+      → 404 → 403 (mekanik dan SPK ini bukan miliknya; atau mekanik mengirim
+      kunci selain `diagnosis`) → 422 → 409 `work_order_locked` (status
+      bukan `QUEUED`, `IN_PROGRESS`, atau `WAITING_PARTS`) → 200 dengan
+      rincian sesudah diubah.
+
+      Baris SPK dikunci (`SELECT … FOR UPDATE`) di transaksi yang sama
+      dengan `UPDATE`, status dan kepemilikan mekanik diperiksa ulang
+      sesudah dikunci, dan `UPDATE` hanya menyentuh field yang dikirim.
+      `{}` tetap diperiksa terhadap status (SPK terkunci → 409). Mengubah
+      atau melepas mekanik tidak menulis linimasa. Tidak ada pesan WhatsApp.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/NomorSpkPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/spk.yaml#/UbahSpkRequest'
+          example:
+            diagnosis: Kampas rem depan habis.
+    responses:
+      '200':
+        description: SPK sesudah diubah.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`work_order_locked`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              terkunci:
+                $ref: '../components/examples/contoh.yaml#/GalatTerkunci'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

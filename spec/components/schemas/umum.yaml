@@ -1,0 +1,368 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+KodeGalat:
+  type: string
+  description: |
+    Kode galat yang stabil untuk dibaca program. Teks `message` berbahasa
+    Indonesia untuk ditampilkan ke pengguna.
+
+    | HTTP | code | Kapan |
+    |---|---|---|
+    | 400 | `bad_request` | badan JSON tidak terbaca, bukan objek JSON, atau memuat byte UTF-8 tidak sah |
+    | 401 | `unauthenticated` | tanpa token, token rusak atau tak dikenal, sesi habis, atau staf nonaktif |
+    | 401 | `invalid_credentials` | masuk staf gagal; sama untuk email tak dikenal, sandi salah, dan akun nonaktif |
+    | 403 | `forbidden` | peran staf tidak boleh memanggil rute itu, mekanik membuka SPK yang bukan miliknya, atau mekanik memakai bagian rute yang khusus kasir (lihat "Peran dan sesi") |
+    | 403 | `setup_disabled` | `POST /api/setup` saat env `SETUP_TOKEN` kosong |
+    | 403 | `setup_token_invalid` | `POST /api/setup` dengan token yang tidak sama dengan `SETUP_TOKEN` |
+    | 404 | `not_found` | sumber tidak ada, token publik tak dikenal, rute tak dikenal, atau metode yang tidak tertulis |
+    | 409 | `already_set_up` | `POST /api/setup` padahal sudah ada akun staf |
+    | 409 | `email_taken` | email sudah dipakai staf lain |
+    | 409 | `last_owner` | perubahan staf akan meninggalkan outlet tanpa pemilik aktif |
+    | 409 | `phone_taken` | nomor HP (bentuk seragam) sudah dipakai pelanggan lain |
+    | 409 | `plate_taken` | kunci plat sudah dipakai kendaraan lain |
+    | 409 | `plate_owned_by_other_customer` | menjadikan booking SPK padahal platnya terdaftar atas pelanggan lain (bukan pemilik nomor HP booking) |
+    | 409 | `service_name_taken` | nama jasa sudah dipakai jasa lain |
+    | 409 | `sku_taken` | SKU sudah dipakai sparepart lain |
+    | 409 | `status_transition_invalid` | perpindahan status SPK yang tidak tertulis di "Status SPK", termasuk membatalkan SPK `DONE`, `PICKED_UP`, atau `CANCELLED` |
+    | 409 | `not_paid_off` | menandai SPK `PICKED_UP` padahal sisa tagihannya belum 0 |
+    | 409 | `has_payments` | membatalkan SPK yang sudah punya pembayaran |
+    | 409 | `work_order_locked` | menambah atau menghapus item, atau mengubah SPK (`PATCH`), padahal statusnya bukan `QUEUED`, `IN_PROGRESS`, atau `WAITING_PARTS` |
+    | 409 | `work_order_empty` | menandai SPK `DONE` padahal belum ada satu item pun |
+    | 409 | `total_below_paid` | menghapus item yang membuat total SPK lebih kecil dari yang sudah dibayar |
+    | 409 | `work_order_cancelled` | mencatat pembayaran atau mengirim WhatsApp untuk SPK `CANCELLED` |
+    | 409 | `already_picked_up` | mencatat pembayaran untuk SPK yang sudah `PICKED_UP` |
+    | 409 | `work_order_not_done` | mengirim ulang pesan "siap diambil" untuk SPK yang belum `DONE` atau `PICKED_UP` |
+    | 409 | `insufficient_stock` | stok sparepart kurang: item part ditambahkan ke SPK, atau stok keluar manual melebihi stok |
+    | 409 | `booking_transition_invalid` | perpindahan status booking yang tidak tertulis di "Status booking" |
+    | 409 | `too_many_pending_bookings` | nomor HP itu sudah punya 3 booking `PENDING` |
+    | 413 | `payload_too_large` | badan JSON lebih dari 1 MiB |
+    | 422 | `validation_failed` | validasi field (selalu disertai `fields`) |
+    | 429 | `too_many_requests` | email yang sama sudah dicoba masuk 10 kali berturut-turut tanpa berhasil (dikunci 15 menit); disertai header `Retry-After` |
+    | 500 | `internal_error` | kegagalan tak terduga di backend |
+    | 503 | `wa_unavailable` | pesan WhatsApp yang diminta langsung (kirim ulang) gagal dikirim penyedia |
+
+    `x-pesan-baku` berisi `message` yang wajib dipakai semua backend untuk
+    kode tersebut, huruf demi huruf, supaya web menampilkan teks yang sama
+    apa pun backend-nya. `not_found` boleh memakai pesan yang lebih
+    spesifik, misalnya "SPK tidak ditemukan". `insufficient_stock` juga
+    tidak tercantum, tetapi pesannya **bukan** bebas: formatnya baku dan
+    memuat nama sparepart (bagian "Sparepart dan stok" di deskripsi API).
+  enum:
+    - bad_request
+    - unauthenticated
+    - invalid_credentials
+    - forbidden
+    - setup_disabled
+    - setup_token_invalid
+    - not_found
+    - already_set_up
+    - email_taken
+    - last_owner
+    - phone_taken
+    - plate_taken
+    - plate_owned_by_other_customer
+    - service_name_taken
+    - sku_taken
+    - status_transition_invalid
+    - not_paid_off
+    - has_payments
+    - work_order_locked
+    - work_order_empty
+    - total_below_paid
+    - work_order_cancelled
+    - already_picked_up
+    - work_order_not_done
+    - insufficient_stock
+    - booking_transition_invalid
+    - too_many_pending_bookings
+    - payload_too_large
+    - validation_failed
+    - too_many_requests
+    - internal_error
+    - wa_unavailable
+  x-pesan-baku:
+    bad_request: Badan permintaan tidak bisa dibaca
+    unauthenticated: Autentikasi tidak sah atau sudah berakhir
+    invalid_credentials: Email atau kata sandi salah
+    forbidden: Kamu tidak punya akses ke sumber ini
+    setup_disabled: Pemasangan awal tidak aktif di server ini
+    setup_token_invalid: Token pemasangan salah
+    already_set_up: Aplikasi sudah dipasang, silakan masuk dengan akun pemilik
+    email_taken: Email sudah terdaftar
+    last_owner: Harus tetap ada setidaknya satu pemilik yang aktif
+    phone_taken: Nomor HP sudah dipakai pelanggan lain
+    plate_taken: Plat nomor sudah terdaftar
+    plate_owned_by_other_customer: Plat nomor ini terdaftar atas pelanggan lain, periksa lagi data booking
+    service_name_taken: Nama jasa sudah dipakai
+    sku_taken: SKU sudah dipakai
+    status_transition_invalid: Perubahan status SPK ini tidak diizinkan
+    not_paid_off: Lunasi tagihan dulu sebelum kendaraan diserahkan
+    has_payments: SPK yang sudah dibayar tidak bisa dibatalkan
+    work_order_locked: SPK yang sudah selesai, diambil, atau dibatalkan tidak bisa diubah
+    work_order_empty: Tambahkan item jasa atau sparepart dulu sebelum menandai selesai
+    total_below_paid: Total SPK tidak boleh lebih kecil dari yang sudah dibayar
+    work_order_cancelled: SPK ini sudah dibatalkan
+    already_picked_up: Kendaraan sudah diambil
+    work_order_not_done: SPK ini belum selesai
+    booking_transition_invalid: Perubahan status booking ini tidak diizinkan
+    too_many_pending_bookings: Nomor ini masih punya 3 booking yang menunggu konfirmasi
+    payload_too_large: Badan permintaan terlalu besar
+    validation_failed: Data yang dikirim belum valid
+    too_many_requests: Terlalu sering, silakan tunggu sebentar lalu coba lagi
+    internal_error: Terjadi kesalahan di server, silakan coba lagi
+    wa_unavailable: WhatsApp tidak bisa dikirim saat ini, coba lagi nanti
+
+KodeField:
+  type: string
+  description: |
+    Nilai di `fields`: kode aturan yang dilanggar, bukan teks bebas, supaya
+    semua backend menghasilkan galat yang sama persis dan klien bisa
+    menyusun teksnya sendiri.
+
+    | Kode | Arti |
+    |---|---|
+    | `required` | field wajib tidak dikirim, bernilai `null`, atau kosong (setelah dipangkas bila field itu dipangkas) |
+    | `invalid_type` | tipe JSON salah, termasuk `null` pada field opsional yang tidak nullable dan pecahan pada integer |
+    | `invalid_format` | tidak cocok dengan pola atau pilihan yang sah, termasuk parameter query kosong dan tanggal yang tidak ada di kalender |
+    | `too_short` | teks lebih pendek dari batas bawah |
+    | `too_long` | teks lebih panjang dari batas atas |
+    | `out_of_range` | angka atau tanggal di luar rentang |
+    | `too_many_items` | jumlah item SPK sudah 50 (dilaporkan di `items`) |
+    | `unknown_reference` | UUID yang formatnya sah, tetapi baris yang dirujuknya tidak ada (atau tidak boleh dipakai di tempat itu, tertulis di deskripsi field) |
+    | `inactive_reference` | UUID merujuk baris yang ada tetapi nonaktif (jasa, sparepart, atau mekanik nonaktif) |
+
+    Satu field hanya punya satu kode, dipilih menurut prioritas: tipe →
+    kosong → panjang/rentang → format → rujukan. Contoh: `name: 123` →
+    `invalid_type`; `name: "  "` → `required`; `name: "a"` → `too_short`;
+    `type: "TRUCK"` → `invalid_format`. Pengecualian yang tertulis di
+    deskripsi field (nomor HP, plat, tanggal) mengalahkan urutan ini.
+  enum:
+    - required
+    - invalid_type
+    - invalid_format
+    - too_short
+    - too_long
+    - out_of_range
+    - too_many_items
+    - unknown_reference
+    - inactive_reference
+
+Galat:
+  type: object
+  description: |
+    Bentuk galat untuk semua rute. `fields` hanya muncul bila `code` =
+    `validation_failed`, berupa objek nama-field → kode aturan (`KodeField`).
+    Nama field memakai nama di badan atau parameter permintaan (camelCase).
+    Semua field yang gagal dilaporkan sekaligus.
+  additionalProperties: false
+  required: [error]
+  properties:
+    error:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          $ref: '#/KodeGalat'
+        message:
+          type: string
+          minLength: 1
+        fields:
+          type: object
+          minProperties: 1
+          additionalProperties:
+            $ref: '#/KodeField'
+      if:
+        properties:
+          code:
+            const: validation_failed
+      then:
+        required: [fields]
+      else:
+        not:
+          required: [fields]
+
+Meta:
+  type: object
+  description: Keterangan paginasi. `total` = jumlah seluruh baris yang cocok dengan filter, bukan jumlah di halaman ini.
+  additionalProperties: false
+  required: [page, limit, total]
+  properties:
+    page:
+      type: integer
+      minimum: 1
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 50
+    total:
+      type: integer
+      minimum: 0
+
+Kesehatan:
+  type: object
+  additionalProperties: false
+  required: [status]
+  properties:
+    status:
+      type: string
+      const: ok
+
+Uuid:
+  type: string
+  description: |
+    UUID kanonik huruf kecil yang dibuat aplikasi. Di path, bentuk lain
+    (termasuk huruf besar) diperlakukan sebagai tidak ada (404); di badan dan
+    query, bentuk lain → 422 `invalid_format`.
+  pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+UuidMasukan:
+  type: string
+  description: |
+    UUID di badan permintaan. Tidak dikirim, `null`, atau kosong →
+    `required` (untuk field wajib); bukan string → `invalid_type`; bukan
+    UUID kanonik huruf kecil → `invalid_format`. Aturan rujukannya tertulis
+    di field masing-masing.
+  pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+TokenPublik:
+  type: string
+  description: |
+    Token acak untuk rute pelanggan tanpa akun: `bookingToken` (satu
+    booking) dan `trackingToken` (satu SPK). 32 byte dari pembangkit acak
+    kriptografis, dikodekan base64url **tanpa** padding, sehingga selalu
+    43 karakter `[A-Za-z0-9_-]`. Di path, bentuk lain diperlakukan sebagai
+    tidak ada (404) tanpa bertanya ke database.
+  pattern: '^[A-Za-z0-9_-]{43}$'
+
+NomorHp:
+  type: string
+  description: Nomor HP Indonesia dalam bentuk seragam `628…`, 10 sampai 15 digit.
+  pattern: '^628[0-9]{7,12}$'
+
+NomorHpSamaran:
+  type: string
+  description: |
+    Nomor HP yang disamarkan untuk respons publik: **4 digit pertama**,
+    tepat empat `*`, lalu **4 digit terakhir** bentuk seragam, apa pun
+    panjang nomornya. Contoh: `6281234567890` → `6281****7890`;
+    `6281234567` → `6281****4567`; `628123456789012` → `6281****9012`.
+    Respons publik tidak pernah memuat nomor utuh.
+  pattern: '^628[0-9][*]{4}[0-9]{4}$'
+
+NomorHpMasukan:
+  type: string
+  description: |
+    Nomor HP Indonesia seperti diketik pengguna. Diperiksa berurutan:
+
+    1. Bukan string → `invalid_type`.
+    2. Pangkas spasi, tab, CR, dan LF di awal dan akhir, lalu buang semua
+       spasi (U+0020) dan tanda hubung (`-`) di mana pun. Hasilnya kosong →
+       `required`.
+    3. Hasilnya tidak cocok dengan `^(\+62|62|0)8[0-9]*$` → `invalid_format`
+       (mis. huruf, tanda kurung, `+08…`, `6208…`, atau nomor luar negeri).
+    4. Bentuk seragam = `62` + bagian sesudah awalan `+62`, `62`, atau `0`.
+       Panjangnya kurang dari 10 digit → `too_short`; lebih dari 15 →
+       `too_long`.
+
+    Yang disimpan dan dibalas selalu bentuk seragam. Contoh:
+
+    | Diketik | Hasil |
+    |---|---|
+    | `0812-3456-7890` | `6281234567890` |
+    | `+62 812 3456 7890` | `6281234567890` |
+    | `6281234567890` | `6281234567890` |
+    | `08123456` | `too_short` (bentuk seragam `628123456`, 9 digit) |
+    | `0812345678901234` | `too_long` (17 digit) |
+    | `021-555-1234` | `invalid_format` (bukan 08…) |
+    | `(0812) 3456` | `invalid_format` |
+
+    Urutan pemeriksaan ini sengaja berbeda dari prioritas umum `KodeField`
+    (format dinilai sebelum panjang), karena panjang baru bisa dihitung
+    setelah awalannya dikenali.
+
+PlatKunci:
+  type: string
+  description: |
+    Kunci plat untuk pencarian dan keunikan: huruf besar A-Z dan angka saja,
+    diawali huruf, 2 sampai 12 karakter. Lihat `PlatMasukan`.
+  pattern: '^[A-Z][A-Z0-9]{1,11}$'
+
+PlatTampilan:
+  type: string
+  description: |
+    Plat untuk ditampilkan, diturunkan dari kunci (lihat `PlatMasukan`).
+    Menghapus semua spasinya selalu menghasilkan kunci plat.
+  maxLength: 14
+  pattern: '^[A-Z][A-Z0-9]*( [A-Z0-9]+){0,2}$'
+
+PlatMasukan:
+  type: string
+  description: |
+    Plat nomor seperti diketik. Diperiksa berurutan:
+
+    1. Bukan string → `invalid_type`.
+    2. Pangkas spasi, tab, CR, dan LF di awal dan akhir, lalu buang semua
+       spasi (U+0020), tanda hubung (`-`), dan titik (`.`) di mana pun, lalu
+       ubah huruf a-z menjadi A-Z (huruf lain tidak disentuh). Hasilnya
+       kosong → `required`.
+    3. Hasilnya memuat karakter selain A-Z dan 0-9 (termasuk huruf
+       non-ASCII, tab di tengah, garis miring), atau tidak diawali huruf →
+       `invalid_format`.
+    4. Kurang dari 2 karakter → `too_short`; lebih dari 12 → `too_long`.
+
+    Hasil langkah 2 adalah **kunci plat** (`PlatKunci`), dipakai untuk
+    keunikan dan pencarian. **Plat tampilan** diturunkan dari kunci:
+
+    - Bila kunci cocok dengan `^([A-Z]+)([0-9]+)([A-Z]*)$` (huruf depan,
+      angka, huruf belakang yang boleh kosong), tampilan = kelompok yang
+      tidak kosong digabung dengan **satu** spasi.
+    - Selain itu (mis. tanpa angka, atau ada huruf lalu angka lagi),
+      tampilan = kunci apa adanya (huruf besar, tanpa spasi).
+
+    | Diketik | Kunci | Tampilan |
+    |---|---|---|
+    | `b1234xyz` | `B1234XYZ` | `B 1234 XYZ` |
+    | ` B 1234  XYZ ` | `B1234XYZ` | `B 1234 XYZ` |
+    | `B-1234-XYZ` | `B1234XYZ` | `B 1234 XYZ` |
+    | `ab 12 c` | `AB12C` | `AB 12 C` |
+    | `D 1` | `D1` | `D 1` |
+    | `RI1` | `RI1` | `RI 1` |
+    | `B 1234 XYZ 5` | `B1234XYZ5` | `B1234XYZ5` (tidak mengikuti pola) |
+    | `ABCDE` | `ABCDE` | `ABCDE` (tidak mengikuti pola) |
+    | `1234 AB` | — | `invalid_format` (diawali angka) |
+    | `B` | — | `too_short` |
+    | `B 1234 ABCDEFGH` | — | `too_long` (13 karakter) |
+    | `B/1234` | — | `invalid_format` |
+
+    Urutan pemeriksaan ini mengalahkan prioritas umum `KodeField` (format
+    dinilai sebelum panjang), sama seperti nomor HP.
+
+Tanggal:
+  type: string
+  description: Tanggal kalender `YYYY-MM-DD` tanpa jam.
+  pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+
+WaktuMasukan:
+  type: string
+  description: |
+    Waktu RFC 3339 dengan detik dan zona waktu wajib, mis.
+    `2026-11-28T15:00:00+07:00` atau `2026-11-28T08:00:00.000Z`. Pola
+    `^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?(Z|[+-][0-9]{2}:[0-9]{2})$`
+    (huruf `T` dan `Z` besar). Tidak cocok, tanggal yang tidak ada di
+    kalender, jam di luar 00–23, menit atau detik di luar 00–59, atau
+    selisih zona di luar ±14:00 → `invalid_format`. Sesudah diubah ke UTC,
+    di luar `2000-01-01T00:00:00.000Z` sampai `2999-12-31T23:59:59.999Z`
+    → `out_of_range`. Disimpan dan dibalas dalam UTC dengan milidetik.
+  pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?(Z|[+-][0-9]{2}:[0-9]{2})$'
+
+WaktuUtc:
+  type: string
+  format: date-time
+  description: Waktu UTC; jumlah digit pecahan detik bebas.
+
+Rupiah:
+  type: integer
+  description: Rupiah bulat, tidak negatif.
+  minimum: 0

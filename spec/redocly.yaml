@@ -1,0 +1,33 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+# Konfigurasi lint kontrak API. Jalankan dari folder project:
+#   npx @redocly/cli@1.34.20 lint spec/openapi.yaml --config spec/redocly.yaml
+# (Bagian 0b menambahkan perintah yang sama sebagai `npm run lint-spec` di tests/kontrak.)
+apis:
+  bengkel:
+    root: ./openapi.yaml
+
+extends:
+  - recommended
+
+rules:
+  # Lisensi produk ini tertutup; tidak ada halaman lisensi publik atau
+  # identifier SPDX untuk ditautkan.
+  info-license-strict: off
+  # Server di kontrak ini memang backend lokal (port 8801/8802/8803); belum
+  # ada server publik.
+  no-server-example.com: off
+  # Satu-satunya operasi tanpa 4xx adalah GET /api/health, GET /api/setup,
+  # GET /api/outlet, dan GET /api/public/services, yang memang tidak punya
+  # kondisi galat dari sisi klien.
+  operation-4xx-response: off
+  # Contoh di spec wajib cocok dengan skemanya; dinaikkan dari peringatan
+  # menjadi galat supaya contoh yang basi langsung gagal lint. allowAdditionalProperties
+  # true: bawaan aturan ini menyisipkan additionalProperties: false ke setiap skema,
+  # termasuk ke dalam klausa if milik Galat, sehingga contoh validation_failed yang sah
+  # ikut ditolak. Skema respons di spec ini sudah menulis additionalProperties: false
+  # sendiri, jadi field asing di contoh respons tetap tertangkap.
+  no-invalid-media-type-examples:
+    severity: error
+    allowAdditionalProperties: true

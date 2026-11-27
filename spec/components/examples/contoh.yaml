@@ -1,0 +1,847 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+# Contoh respons yang dipakai ulang di banyak operasi. Semua contoh di sini divalidasi
+# terhadap skemanya oleh `redocly lint` (aturan no-invalid-media-type-examples). Datanya
+# saling cocok: pelanggan Budi, motor B 1234 XYZ, mekanik Andi, SPK S-0012.
+
+StafPemilik:
+  summary: Pemilik
+  value:
+    data:
+      staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000001
+      name: Siti Pemilik
+      email: pemilik@contoh.id
+      role: owner
+      isActive: true
+      createdAt: '2026-11-27T02:00:00.000Z'
+
+AuthStaf:
+  summary: Masuk berhasil
+  value:
+    data:
+      token: sS3ssionTokenExampleAbcdefghijklmnopqrstu12
+      staff:
+        staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000001
+        name: Siti Pemilik
+        email: pemilik@contoh.id
+        role: owner
+        isActive: true
+        createdAt: '2026-11-27T02:00:00.000Z'
+
+DaftarStaf:
+  summary: Tiga peran staf
+  value:
+    data:
+      - staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000003
+        name: Andi Mekanik
+        email: andi@contoh.id
+        role: mechanic
+        isActive: true
+        createdAt: '2026-11-27T02:10:00.000Z'
+      - staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000002
+        name: Rina Kasir
+        email: rina@contoh.id
+        role: cashier
+        isActive: true
+        createdAt: '2026-11-27T02:05:00.000Z'
+      - staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000001
+        name: Siti Pemilik
+        email: pemilik@contoh.id
+        role: owner
+        isActive: true
+        createdAt: '2026-11-27T02:00:00.000Z'
+
+DaftarMekanik:
+  summary: Mekanik aktif
+  value:
+    data:
+      - staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000003
+        name: Andi Mekanik
+
+Outlet:
+  summary: Profil outlet terisi
+  value:
+    data:
+      name: Bengkel Maju Jaya
+      tagline: Servis motor dan mobil, cepat dan jujur
+      address: Jl. Merdeka No. 10, Bandung
+      phone: '6281299990000'
+      openingHours: Senin–Sabtu 08.00–17.00
+      mapsUrl: https://maps.google.com/?q=-6.9175,107.6191
+      receiptFooter: Garansi servis 7 hari.
+
+OutletBawaan:
+  summary: Profil outlet sesudah migration pertama
+  value:
+    data:
+      name: Nama Bengkel
+      tagline: ''
+      address: ''
+      phone: null
+      openingHours: ''
+      mapsUrl: ''
+      receiptFooter: ''
+
+Pelanggan:
+  summary: Pelanggan dengan satu kendaraan
+  value:
+    data:
+      customerId: 1c1c1c1c-0000-4000-8000-000000000001
+      name: Budi Santoso
+      phone: '6281234567890'
+      address: Jl. Kenanga 5
+      notes: ''
+      vehicles:
+        - vehicleId: 2d2d2d2d-0000-4000-8000-000000000001
+          customerId: 1c1c1c1c-0000-4000-8000-000000000001
+          type: MOTOR
+          plate: B 1234 XYZ
+          plateKey: B1234XYZ
+          brand: Honda
+          model: Vario 125
+          year: 2021
+          color: Hitam
+          createdAt: '2026-11-28T01:00:00.000Z'
+          updatedAt: '2026-11-28T01:00:00.000Z'
+      createdAt: '2026-11-28T01:00:00.000Z'
+      updatedAt: '2026-11-28T01:00:00.000Z'
+
+DaftarPelanggan:
+  summary: Satu halaman pelanggan
+  value:
+    data:
+      - customerId: 1c1c1c1c-0000-4000-8000-000000000001
+        name: Budi Santoso
+        phone: '6281234567890'
+        address: Jl. Kenanga 5
+        notes: ''
+        vehicles:
+          - vehicleId: 2d2d2d2d-0000-4000-8000-000000000001
+            customerId: 1c1c1c1c-0000-4000-8000-000000000001
+            type: MOTOR
+            plate: B 1234 XYZ
+            plateKey: B1234XYZ
+            brand: Honda
+            model: Vario 125
+            year: 2021
+            color: Hitam
+            createdAt: '2026-11-28T01:00:00.000Z'
+            updatedAt: '2026-11-28T01:00:00.000Z'
+        createdAt: '2026-11-28T01:00:00.000Z'
+        updatedAt: '2026-11-28T01:00:00.000Z'
+    meta:
+      page: 1
+      limit: 20
+      total: 1
+
+Kendaraan:
+  summary: Kendaraan baru
+  value:
+    data:
+      vehicleId: 2d2d2d2d-0000-4000-8000-000000000001
+      customerId: 1c1c1c1c-0000-4000-8000-000000000001
+      type: MOTOR
+      plate: B 1234 XYZ
+      plateKey: B1234XYZ
+      brand: Honda
+      model: Vario 125
+      year: 2021
+      color: Hitam
+      createdAt: '2026-11-28T01:00:00.000Z'
+      updatedAt: '2026-11-28T01:00:00.000Z'
+
+CariPlat:
+  summary: Hasil cari plat "b1234"
+  value:
+    data:
+      - vehicle:
+          vehicleId: 2d2d2d2d-0000-4000-8000-000000000001
+          customerId: 1c1c1c1c-0000-4000-8000-000000000001
+          type: MOTOR
+          plate: B 1234 XYZ
+          plateKey: B1234XYZ
+          brand: Honda
+          model: Vario 125
+          year: 2021
+          color: Hitam
+          createdAt: '2026-11-28T01:00:00.000Z'
+          updatedAt: '2026-11-28T01:00:00.000Z'
+        customer:
+          customerId: 1c1c1c1c-0000-4000-8000-000000000001
+          name: Budi Santoso
+          phone: '6281234567890'
+    meta:
+      page: 1
+      limit: 20
+      total: 1
+
+Jasa:
+  summary: Jasa ganti oli
+  value:
+    data:
+      serviceId: 3e3e3e3e-0000-4000-8000-000000000001
+      name: Ganti Oli
+      description: Ganti oli mesin dan cek kebocoran.
+      price: 35000
+      durationMinutes: 30
+      isPublic: true
+      isActive: true
+      sortOrder: 1
+      createdAt: '2026-11-27T03:00:00.000Z'
+      updatedAt: '2026-11-27T03:00:00.000Z'
+
+DaftarJasa:
+  summary: Semua jasa (staf)
+  value:
+    data:
+      - serviceId: 3e3e3e3e-0000-4000-8000-000000000001
+        name: Ganti Oli
+        description: Ganti oli mesin dan cek kebocoran.
+        price: 35000
+        durationMinutes: 30
+        isPublic: true
+        isActive: true
+        sortOrder: 1
+        createdAt: '2026-11-27T03:00:00.000Z'
+        updatedAt: '2026-11-27T03:00:00.000Z'
+      - serviceId: 3e3e3e3e-0000-4000-8000-000000000002
+        name: Servis Ringan
+        description: ''
+        price: 75000
+        durationMinutes: null
+        isPublic: false
+        isActive: true
+        sortOrder: 2
+        createdAt: '2026-11-27T03:01:00.000Z'
+        updatedAt: '2026-11-27T03:01:00.000Z'
+
+JasaPublik:
+  summary: Jasa di website
+  value:
+    data:
+      - serviceId: 3e3e3e3e-0000-4000-8000-000000000001
+        name: Ganti Oli
+        description: Ganti oli mesin dan cek kebocoran.
+        price: 35000
+        durationMinutes: 30
+
+SparepartPemilik:
+  summary: Dilihat pemilik (ada costPrice)
+  value:
+    data:
+      partId: 4f4f4f4f-0000-4000-8000-000000000001
+      sku: OLI-10W40-08
+      name: Oli Mesin 10W-40 0,8 L
+      unit: botol
+      price: 55000
+      costPrice: 42000
+      stock: 11
+      minStock: 5
+      stockLevel: ok
+      isActive: true
+      createdAt: '2026-11-27T03:10:00.000Z'
+      updatedAt: '2026-11-28T01:20:00.000Z'
+
+DaftarSparepartPemilik:
+  summary: Dilihat pemilik (ada costPrice)
+  value:
+    data:
+      - partId: 4f4f4f4f-0000-4000-8000-000000000002
+        sku: KR-DPN-VARIO
+        name: Kampas Rem Depan Vario
+        unit: set
+        price: 75000
+        costPrice: 0
+        stock: 2
+        minStock: 3
+        stockLevel: low
+        isActive: true
+        createdAt: '2026-11-27T03:11:00.000Z'
+        updatedAt: '2026-11-28T01:25:00.000Z'
+      - partId: 4f4f4f4f-0000-4000-8000-000000000001
+        sku: OLI-10W40-08
+        name: Oli Mesin 10W-40 0,8 L
+        unit: botol
+        price: 55000
+        costPrice: 42000
+        stock: 11
+        minStock: 5
+        stockLevel: ok
+        isActive: true
+        createdAt: '2026-11-27T03:10:00.000Z'
+        updatedAt: '2026-11-28T01:20:00.000Z'
+    meta:
+      page: 1
+      limit: 20
+      total: 2
+
+DaftarSparepartStaf:
+  summary: Dilihat kasir atau mekanik (kunci costPrice tidak ada)
+  value:
+    data:
+      - partId: 4f4f4f4f-0000-4000-8000-000000000002
+        sku: KR-DPN-VARIO
+        name: Kampas Rem Depan Vario
+        unit: set
+        price: 75000
+        stock: 2
+        minStock: 3
+        stockLevel: low
+        isActive: true
+        createdAt: '2026-11-27T03:11:00.000Z'
+        updatedAt: '2026-11-28T01:25:00.000Z'
+      - partId: 4f4f4f4f-0000-4000-8000-000000000001
+        sku: OLI-10W40-08
+        name: Oli Mesin 10W-40 0,8 L
+        unit: botol
+        price: 55000
+        stock: 11
+        minStock: 5
+        stockLevel: ok
+        isActive: true
+        createdAt: '2026-11-27T03:10:00.000Z'
+        updatedAt: '2026-11-28T01:20:00.000Z'
+    meta:
+      page: 1
+      limit: 20
+      total: 2
+
+KartuStok:
+  summary: Kartu stok oli (terbaru dulu)
+  value:
+    data:
+      - movementId: 8d8d8d8d-0000-4000-8000-000000000003
+        type: USED
+        quantity: -1
+        stockAfter: 11
+        note: ''
+        workOrderNumber: S-0012
+        staff:
+          staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000002
+          name: Rina Kasir
+        createdAt: '2026-11-28T01:20:00.000Z'
+      - movementId: 8d8d8d8d-0000-4000-8000-000000000002
+        type: COUNT
+        quantity: -1
+        stockAfter: 12
+        note: Opname, satu botol bocor
+        workOrderNumber: null
+        staff:
+          staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000001
+          name: Siti Pemilik
+        createdAt: '2026-11-27T10:00:00.000Z'
+      - movementId: 8d8d8d8d-0000-4000-8000-000000000001
+        type: IN
+        quantity: 13
+        stockAfter: 13
+        note: Stok awal
+        workOrderNumber: null
+        staff:
+          staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000001
+          name: Siti Pemilik
+        createdAt: '2026-11-27T03:10:00.000Z'
+    meta:
+      page: 1
+      limit: 20
+      total: 3
+
+Booking:
+  summary: Booking menunggu konfirmasi
+  value:
+    data:
+      bookingId: 5a5a5a5a-0000-4000-8000-000000000001
+      number: B-0007
+      status: PENDING
+      customerName: Budi Santoso
+      phone: '6281234567890'
+      vehicleType: MOTOR
+      plate: B 1234 XYZ
+      plateKey: B1234XYZ
+      vehicleBrand: Honda
+      vehicleModel: Vario 125
+      service:
+        serviceId: 3e3e3e3e-0000-4000-8000-000000000001
+        name: Ganti Oli
+      visitDate: '2026-11-28'
+      complaint: Rem depan bunyi saat dipakai.
+      rejectReason: null
+      workOrderNumber: null
+      handledBy: null
+      wa:
+        bookingConfirmed: null
+        bookingRejected: null
+      createdAt: '2026-11-27T12:30:00.000Z'
+      updatedAt: '2026-11-27T12:30:00.000Z'
+
+BookingDikonfirmasi:
+  summary: Booking sesudah dikonfirmasi, pesan WhatsApp terkirim
+  value:
+    data:
+      bookingId: 5a5a5a5a-0000-4000-8000-000000000001
+      number: B-0007
+      status: CONFIRMED
+      customerName: Budi Santoso
+      phone: '6281234567890'
+      vehicleType: MOTOR
+      plate: B 1234 XYZ
+      plateKey: B1234XYZ
+      vehicleBrand: Honda
+      vehicleModel: Vario 125
+      service:
+        serviceId: 3e3e3e3e-0000-4000-8000-000000000001
+        name: Ganti Oli
+      visitDate: '2026-11-28'
+      complaint: Rem depan bunyi saat dipakai.
+      rejectReason: null
+      workOrderNumber: null
+      handledBy:
+        staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000002
+        name: Rina Kasir
+      wa:
+        bookingConfirmed:
+          status: sent
+          createdAt: '2026-11-27T13:00:00.000Z'
+        bookingRejected: null
+      createdAt: '2026-11-27T12:30:00.000Z'
+      updatedAt: '2026-11-27T13:00:00.000Z'
+
+DaftarBooking:
+  summary: Satu halaman booking
+  value:
+    data:
+      - bookingId: 5a5a5a5a-0000-4000-8000-000000000001
+        number: B-0007
+        status: PENDING
+        customerName: Budi Santoso
+        phone: '6281234567890'
+        vehicleType: MOTOR
+        plate: B 1234 XYZ
+        plateKey: B1234XYZ
+        vehicleBrand: Honda
+        vehicleModel: Vario 125
+        service: null
+        visitDate: '2026-11-28'
+        complaint: Rem depan bunyi saat dipakai.
+        rejectReason: null
+        workOrderNumber: null
+        handledBy: null
+        wa:
+          bookingConfirmed: null
+          bookingRejected: null
+        createdAt: '2026-11-27T12:30:00.000Z'
+        updatedAt: '2026-11-27T12:30:00.000Z'
+    meta:
+      page: 1
+      limit: 20
+      total: 1
+
+BookingDibuat:
+  summary: Booking dari website diterima sistem
+  value:
+    data:
+      bookingToken: Bk7pL2qW9zX4mN8vR1sT5yU3hJ6gF0dC_aE-oIuYtRe
+      booking:
+        number: B-0007
+        status: PENDING
+        customerName: Budi Santoso
+        phone: 6281****7890
+        vehicleType: MOTOR
+        plate: B 1234 XYZ
+        vehicleBrand: Honda
+        vehicleModel: Vario 125
+        serviceName: Ganti Oli
+        visitDate: '2026-11-28'
+        complaint: Rem depan bunyi saat dipakai.
+        rejectReason: null
+        workOrderNumber: null
+        createdAt: '2026-11-27T12:30:00.000Z'
+
+BookingPublikDitolak:
+  summary: Booking ditolak, alasan terlihat pelanggan
+  value:
+    data:
+      number: B-0007
+      status: REJECTED
+      customerName: Budi Santoso
+      phone: 6281****7890
+      vehicleType: MOTOR
+      plate: B 1234 XYZ
+      vehicleBrand: Honda
+      vehicleModel: Vario 125
+      serviceName: null
+      visitDate: '2026-11-28'
+      complaint: Rem depan bunyi saat dipakai.
+      rejectReason: Bengkel tutup tanggal itu, silakan pilih tanggal lain.
+      workOrderNumber: null
+      createdAt: '2026-11-27T12:30:00.000Z'
+
+SpkDetail:
+  summary: SPK sedang dikerjakan, sudah ada uang muka
+  value:
+    data:
+      number: S-0012
+      status: IN_PROGRESS
+      paymentStatus: partial
+      customer:
+        customerId: 1c1c1c1c-0000-4000-8000-000000000001
+        name: Budi Santoso
+        phone: '6281234567890'
+      vehicle:
+        vehicleId: 2d2d2d2d-0000-4000-8000-000000000001
+        type: MOTOR
+        plate: B 1234 XYZ
+        brand: Honda
+        model: Vario 125
+        year: 2021
+        color: Hitam
+      booking:
+        bookingId: 5a5a5a5a-0000-4000-8000-000000000001
+        number: B-0007
+      mechanic:
+        staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000003
+        name: Andi Mekanik
+      complaint: Rem depan bunyi saat dipakai.
+      diagnosis: Kampas rem depan habis.
+      odometer: 18250
+      estimatedDoneAt: '2026-11-28T08:00:00.000Z'
+      serviceSubtotal: 35000
+      partSubtotal: 130000
+      total: 165000
+      paidAmount: 50000
+      remainingAmount: 115000
+      cancelReason: null
+      trackingToken: Vt4mQ9xZ2kLp8RwN5sYb7HcJ3fGd6EaU1oIq0Te_-Xk
+      createdBy:
+        staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000002
+        name: Rina Kasir
+      createdAt: '2026-11-28T01:15:00.000Z'
+      updatedAt: '2026-11-28T01:40:00.000Z'
+      items:
+        - itemId: 6b6b6b6b-0000-4000-8000-000000000001
+          type: SERVICE
+          serviceId: 3e3e3e3e-0000-4000-8000-000000000001
+          partId: null
+          name: Ganti Oli
+          price: 35000
+          quantity: 1
+          subtotal: 35000
+          createdAt: '2026-11-28T01:15:00.000Z'
+        - itemId: 6b6b6b6b-0000-4000-8000-000000000002
+          type: PART
+          serviceId: null
+          partId: 4f4f4f4f-0000-4000-8000-000000000001
+          name: Oli Mesin 10W-40 0,8 L
+          price: 55000
+          quantity: 1
+          subtotal: 55000
+          createdAt: '2026-11-28T01:20:00.000Z'
+        - itemId: 6b6b6b6b-0000-4000-8000-000000000003
+          type: PART
+          serviceId: null
+          partId: 4f4f4f4f-0000-4000-8000-000000000002
+          name: Kampas Rem Depan Vario
+          price: 75000
+          quantity: 1
+          subtotal: 75000
+          createdAt: '2026-11-28T01:25:00.000Z'
+      payments:
+        - paymentId: 7c7c7c7c-0000-4000-8000-000000000001
+          amount: 50000
+          method: cash
+          recordedBy:
+            staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000002
+            name: Rina Kasir
+          createdAt: '2026-11-28T01:30:00.000Z'
+      timeline:
+        - fromStatus: null
+          toStatus: QUEUED
+          by:
+            staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000002
+            name: Rina Kasir
+          note: ''
+          createdAt: '2026-11-28T01:15:00.000Z'
+        - fromStatus: QUEUED
+          toStatus: IN_PROGRESS
+          by:
+            staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000003
+            name: Andi Mekanik
+          note: ''
+          createdAt: '2026-11-28T01:40:00.000Z'
+      wa:
+        workOrderCreated:
+          status: sent
+          createdAt: '2026-11-28T01:15:01.000Z'
+        workOrderDone: null
+        receipt: null
+
+SpkBaru:
+  summary: SPK baru, belum ada item
+  value:
+    data:
+      number: S-0013
+      status: QUEUED
+      paymentStatus: paid
+      customer:
+        customerId: 1c1c1c1c-0000-4000-8000-000000000001
+        name: Budi Santoso
+        phone: '6281234567890'
+      vehicle:
+        vehicleId: 2d2d2d2d-0000-4000-8000-000000000001
+        type: MOTOR
+        plate: B 1234 XYZ
+        brand: Honda
+        model: Vario 125
+        year: 2021
+        color: Hitam
+      booking: null
+      mechanic: null
+      complaint: Servis rutin 2.000 km.
+      diagnosis: ''
+      odometer: null
+      estimatedDoneAt: null
+      serviceSubtotal: 0
+      partSubtotal: 0
+      total: 0
+      paidAmount: 0
+      remainingAmount: 0
+      cancelReason: null
+      trackingToken: Vt4mQ9xZ2kLp8RwN5sYb7HcJ3fGd6EaU1oIq0Te_-Xk
+      createdBy:
+        staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000002
+        name: Rina Kasir
+      createdAt: '2026-11-28T02:00:00.000Z'
+      updatedAt: '2026-11-28T02:00:00.000Z'
+      items: []
+      payments: []
+      timeline:
+        - fromStatus: null
+          toStatus: QUEUED
+          by:
+            staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000002
+            name: Rina Kasir
+          note: ''
+          createdAt: '2026-11-28T02:00:00.000Z'
+      wa:
+        workOrderCreated:
+          status: failed
+          createdAt: '2026-11-28T02:00:01.000Z'
+        workOrderDone: null
+        receipt: null
+
+DaftarSpk:
+  summary: Papan servis
+  value:
+    data:
+      - number: S-0012
+        status: IN_PROGRESS
+        paymentStatus: partial
+        customer:
+          customerId: 1c1c1c1c-0000-4000-8000-000000000001
+          name: Budi Santoso
+          phone: '6281234567890'
+        vehicle:
+          vehicleId: 2d2d2d2d-0000-4000-8000-000000000001
+          type: MOTOR
+          plate: B 1234 XYZ
+          brand: Honda
+          model: Vario 125
+        mechanic:
+          staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000003
+          name: Andi Mekanik
+        complaint: Rem depan bunyi saat dipakai.
+        itemCount: 3
+        total: 165000
+        paidAmount: 50000
+        estimatedDoneAt: '2026-11-28T08:00:00.000Z'
+        createdAt: '2026-11-28T01:15:00.000Z'
+        updatedAt: '2026-11-28T01:40:00.000Z'
+    meta:
+      page: 1
+      limit: 20
+      total: 1
+
+SpkPublik:
+  summary: Halaman lacak, servis selesai dan belum lunas
+  value:
+    data:
+      outlet:
+        name: Bengkel Maju Jaya
+        tagline: Servis motor dan mobil, cepat dan jujur
+        address: Jl. Merdeka No. 10, Bandung
+        phone: '6281299990000'
+        openingHours: Senin–Sabtu 08.00–17.00
+        mapsUrl: https://maps.google.com/?q=-6.9175,107.6191
+        receiptFooter: Garansi servis 7 hari.
+      number: S-0012
+      status: DONE
+      paymentStatus: partial
+      customerName: Budi Santoso
+      customerPhone: 6281****7890
+      vehicle:
+        type: MOTOR
+        plate: B 1234 XYZ
+        brand: Honda
+        model: Vario 125
+      complaint: Rem depan bunyi saat dipakai.
+      estimatedDoneAt: '2026-11-28T08:00:00.000Z'
+      serviceSubtotal: 35000
+      partSubtotal: 130000
+      total: 165000
+      paidAmount: 50000
+      remainingAmount: 115000
+      cancelReason: null
+      createdAt: '2026-11-28T01:15:00.000Z'
+      items:
+        - type: SERVICE
+          name: Ganti Oli
+          price: 35000
+          quantity: 1
+          subtotal: 35000
+        - type: PART
+          name: Oli Mesin 10W-40 0,8 L
+          price: 55000
+          quantity: 1
+          subtotal: 55000
+        - type: PART
+          name: Kampas Rem Depan Vario
+          price: 75000
+          quantity: 1
+          subtotal: 75000
+      timeline:
+        - fromStatus: null
+          toStatus: QUEUED
+          createdAt: '2026-11-28T01:15:00.000Z'
+        - fromStatus: QUEUED
+          toStatus: IN_PROGRESS
+          createdAt: '2026-11-28T01:40:00.000Z'
+        - fromStatus: IN_PROGRESS
+          toStatus: DONE
+          createdAt: '2026-11-28T07:30:00.000Z'
+
+Rekap:
+  summary: Satu SPK selesai, satu part belum punya harga beli
+  value:
+    data:
+      date: '2026-11-28'
+      workOrderCount: 2
+      doneCount: 1
+      pickedUpCount: 1
+      cancelledCount: 0
+      serviceTotal: 35000
+      partTotal: 130000
+      salesTotal: 165000
+      partCostTotal: 42000
+      grossProfit: 123000
+      partItemsWithoutCost: 1
+      paymentTotal: 165000
+      paymentsByMethod:
+        cash: 50000
+        transfer: 0
+        qris: 115000
+      topServices:
+        - serviceId: 3e3e3e3e-0000-4000-8000-000000000001
+          name: Ganti Oli
+          quantity: 1
+          revenue: 35000
+      topParts:
+        - partId: 4f4f4f4f-0000-4000-8000-000000000002
+          name: Kampas Rem Depan Vario
+          quantity: 1
+          revenue: 75000
+          cost: 0
+          profit: 75000
+        - partId: 4f4f4f4f-0000-4000-8000-000000000001
+          name: Oli Mesin 10W-40 0,8 L
+          quantity: 1
+          revenue: 55000
+          cost: 42000
+          profit: 13000
+      doneByMechanic:
+        - mechanic:
+            staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000003
+            name: Andi Mekanik
+          doneCount: 1
+
+GalatPhoneTaken:
+  summary: Nomor HP sudah dipakai
+  value:
+    error:
+      code: phone_taken
+      message: Nomor HP sudah dipakai pelanggan lain
+
+GalatPlateTaken:
+  summary: Plat sudah terdaftar
+  value:
+    error:
+      code: plate_taken
+      message: Plat nomor sudah terdaftar
+
+GalatStokKurang:
+  summary: Stok sparepart kurang
+  value:
+    error:
+      code: insufficient_stock
+      message: 'Stok sparepart tidak cukup: Kampas Rem Depan Vario (butuh 3 set, tersedia 2 set)'
+
+GalatTransisi:
+  summary: Perpindahan status tidak sah
+  value:
+    error:
+      code: status_transition_invalid
+      message: Perubahan status SPK ini tidak diizinkan
+
+GalatBelumLunas:
+  summary: Belum lunas saat diambil
+  value:
+    error:
+      code: not_paid_off
+      message: Lunasi tagihan dulu sebelum kendaraan diserahkan
+
+GalatTerkunci:
+  summary: SPK sudah terkunci
+  value:
+    error:
+      code: work_order_locked
+      message: SPK yang sudah selesai, diambil, atau dibatalkan tidak bisa diubah
+
+GalatBookingTransisi:
+  summary: Perpindahan status booking tidak sah
+  value:
+    error:
+      code: booking_transition_invalid
+      message: Perubahan status booking ini tidak diizinkan
+
+GalatBookingMenumpuk:
+  summary: Sudah 3 booking menunggu
+  value:
+    error:
+      code: too_many_pending_bookings
+      message: Nomor ini masih punya 3 booking yang menunggu konfirmasi
+
+GalatPlatPelangganLain:
+  summary: Plat milik pelanggan lain
+  value:
+    error:
+      code: plate_owned_by_other_customer
+      message: Plat nomor ini terdaftar atas pelanggan lain, periksa lagi data booking
+
+GalatValidasiBooking:
+  summary: Isian booking belum valid
+  value:
+    error:
+      code: validation_failed
+      message: Data yang dikirim belum valid
+      fields:
+        phone: too_short
+        plate: invalid_format
+        visitDate: out_of_range
+
+GalatValidasiItem:
+  summary: Jasa yang dipilih sudah nonaktif
+  value:
+    error:
+      code: validation_failed
+      message: Data yang dikirim belum valid
+      fields:
+        serviceId: inactive_reference

@@ -1,0 +1,39 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+daily:
+  get:
+    operationId: rekapHarian
+    tags: [Rekap]
+    summary: Rekap bengkel satu hari (tanggal WIB) beserta laba kotor
+    description: |
+      Khusus pemilik (kasir dan mekanik → 403). Urutan: 401 → 403 → 422
+      (`date`) → 200. Arti setiap angka ada di skema `RekapHarian`. Tanggal
+      tanpa data menghasilkan semua angka 0 dan daftar kosong, bukan 404.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/TanggalRekap'
+    responses:
+      '200':
+        description: Rekap.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/rekap.yaml#/RekapHarian'
+            examples:
+              hari:
+                $ref: '../components/examples/contoh.yaml#/Rekap'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

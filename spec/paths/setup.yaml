@@ -1,0 +1,112 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+setup:
+  get:
+    operationId: statusSetup
+    tags: [Setup]
+    summary: Apakah aplikasi masih perlu dipasang
+    description: |
+      Publik. `needsSetup` = `true` selama belum ada satu pun baris di tabel
+      `staff` (staf nonaktif tetap dihitung). Web memakainya untuk memilih
+      antara halaman pasang awal dan halaman masuk. Tidak bergantung pada
+      `SETUP_TOKEN`.
+    security: []
+    responses:
+      '200':
+        description: Status pemasangan.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/staf.yaml#/StatusSetup'
+            example:
+              data:
+                needsSetup: true
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+  post:
+    operationId: pasangAwal
+    tags: [Setup]
+    summary: Membuat akun pemilik pertama (sekali pakai)
+    description: |
+      Publik, tetapi wajib membawa isi env `SETUP_TOKEN`, supaya server yang
+      baru dipasang tidak bisa direbut orang lain sebelum pemiliknya sempat
+      mendaftar. Skrip SQL tidak dipakai karena SQL tidak bisa membuat hash
+      bcrypt.
+
+      Urutan pemeriksaan:
+      1. Badan lebih dari 1 MiB → 413 `payload_too_large`.
+      2. Badan bukan objek JSON → 400 `bad_request`.
+      3. Env `SETUP_TOKEN` kosong atau tidak diisi → 403 `setup_disabled`,
+         apa pun isi badannya.
+      4. Validasi semua field sekaligus → 422 `validation_failed`.
+      5. `token` tidak sama persis dengan `SETUP_TOKEN` → 403
+         `setup_token_invalid`.
+      6. Sudah ada baris di tabel `staff` → 409 `already_set_up`.
+      7. Staf baru dibuat dengan `role` `owner` dan aktif, lalu sesi staf baru
+         dibuat (sama seperti masuk) → 201 `{data: {token, staff}}`.
+
+      Langkah 6 dan 7 wajib berada dalam satu transaksi yang lebih dulu
+      mengunci baris `outlet` (`SELECT … FOR UPDATE`), sehingga beberapa
+      permintaan yang datang bersamaan hanya menghasilkan **satu** pemilik;
+      sisanya 409.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/staf.yaml#/SetupRequest'
+          example:
+            token: isi-SETUP_TOKEN-di-server
+            name: Siti Pemilik
+            email: pemilik@contoh.id
+            password: sandi-rahasia-123
+    responses:
+      '201':
+        description: Pemilik pertama dibuat dan langsung masuk.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/staf.yaml#/AuthStaf'
+            examples:
+              berhasil:
+                $ref: '../components/examples/contoh.yaml#/AuthStaf'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '403':
+        description: '`setup_disabled` (env `SETUP_TOKEN` kosong) atau `setup_token_invalid`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: setup_token_invalid
+                message: Token pemasangan salah
+      '409':
+        description: '`already_set_up`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: already_set_up
+                message: Aplikasi sudah dipasang, silakan masuk dengan akun pemilik
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

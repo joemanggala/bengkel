@@ -1,0 +1,528 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+status:
+  post:
+    operationId: ubahStatusSpk
+    tags: [SPK]
+    summary: Mengubah status SPK (dikerjakan, menunggu part, selesai, diambil)
+    description: |
+      Semua peran staf, dengan batas untuk mekanik. Urutan: 413 → 400 → 401
+      → 404 → 403 (mekanik dan SPK ini bukan miliknya) → 422 (`status`,
+      `note`) → 403 (mekanik dengan tujuan `PICKED_UP`) → 409
+      `status_transition_invalid` → 409 `work_order_empty` (tujuan `DONE`)
+      atau `not_paid_off` (tujuan `PICKED_UP`) → 200 dengan rincian sesudah
+      diubah.
+
+      - Perpindahan sah (selain itu `status_transition_invalid`, termasuk
+        status yang sama dan SPK yang sudah `PICKED_UP` atau `CANCELLED`):
+        `QUEUED` → `IN_PROGRESS`; `IN_PROGRESS` → `WAITING_PARTS`;
+        `WAITING_PARTS` → `IN_PROGRESS`; `IN_PROGRESS` → `DONE`; `DONE` →
+        `PICKED_UP`. `WAITING_PARTS` tidak bisa langsung `DONE`.
+      - Mekanik boleh menuju `IN_PROGRESS`, `WAITING_PARTS`, dan `DONE`
+        untuk SPK miliknya; `PICKED_UP` (menyerahkan kendaraan, terkait
+        uang) hanya pemilik dan kasir.
+      - `DONE` hanya bila SPK punya minimal satu item (`work_order_empty`).
+      - `PICKED_UP` hanya bila sisa tagihan (`total` − `paidAmount`) = 0
+        (`not_paid_off`). SPK bertotal 0 (mis. jasa gratis) boleh langsung
+        diambil.
+      - Berhasil: status diubah dan satu baris linimasa (status lama →
+        baru, staf yang masuk, `note` dipangkas) ditambahkan dalam satu
+        transaksi yang mengunci baris SPK; kepemilikan mekanik diperiksa
+        ulang sesudah dikunci. Dua permintaan bersamaan untuk langkah yang
+        sama menghasilkan tepat satu 200 dan satu 409.
+      - Status menjadi `DONE`: **sesudah commit**, pesan
+        `work_order_done` (siap diambil, memuat total dan tautan lacak)
+        dikirim ke nomor pelanggan dan dicatat. Gagal kirim tidak
+        menggagalkan permintaan (`wa.workOrderDone.status` `failed`). Galat
+        apa pun sesudah commit hanya dicatat di log; balasan tetap 200.
+      - Status lain tidak mengirim WhatsApp. Perubahan status tidak pernah
+        menyentuh stok.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/NomorSpkPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/spk.yaml#/UbahStatusSpkRequest'
+          example:
+            status: WAITING_PARTS
+            note: Kampas rem belum ada, dipesan dulu.
+    responses:
+      '200':
+        description: Status berubah.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`status_transition_invalid`, `work_order_empty`, atau `not_paid_off`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              transisi:
+                $ref: '../components/examples/contoh.yaml#/GalatTransisi'
+              belumLunas:
+                $ref: '../components/examples/contoh.yaml#/GalatBelumLunas'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+cancel:
+  post:
+    operationId: batalkanSpk
+    tags: [SPK]
+    summary: Membatalkan SPK yang belum selesai dan belum dibayar
+    description: |
+      Pemilik dan kasir (mekanik → 403). Urutan: 413 → 400 → 401 → 403 →
+      404 → 422 (`reason`) → 409 `status_transition_invalid` (status bukan
+      `QUEUED`, `IN_PROGRESS`, atau `WAITING_PARTS`) → 409 `has_payments`
+      (`paidAmount` > 0) → 200 dengan rincian sesudah dibatalkan.
+
+      Berhasil, dalam satu transaksi dengan urutan kunci baris SPK → baris
+      sparepart (urut `partId` naik):
+      - status `CANCELLED`, `cancelReason` = alasan (dipangkas), dan satu
+        baris linimasa (status lama → `CANCELLED`, staf yang masuk, `note` =
+        alasan);
+      - **semua part kembali ke stok**: untuk tiap sparepart di SPK ini,
+        `stock` bertambah sebesar jumlah `quantity` item `PART`-nya yang
+        masih ada (sama dengan −jumlah `quantity` kartu stok SPK itu untuk
+        sparepart itu), dan satu baris kartu stok `RETURNED` ditambahkan per
+        sparepart (catatan kosong, staf yang membatalkan). Sparepart yang
+        sudah nonaktif tetap menerima stoknya kembali.
+      - Item tetap tercatat di SPK (untuk dilihat), tetapi SPK batal tidak
+        dihitung di rekap.
+
+      Tidak ada pesan WhatsApp. Alasan batal terlihat pelanggan di halaman
+      lacak.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/NomorSpkPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/spk.yaml#/BatalSpkRequest'
+          example:
+            reason: Pelanggan memutuskan servis di lain hari.
+    responses:
+      '200':
+        description: SPK dibatalkan.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`status_transition_invalid` atau `has_payments`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: has_payments
+                message: SPK yang sudah dibayar tidak bisa dibatalkan
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+items:
+  post:
+    operationId: tambahItemSpk
+    tags: [SPK]
+    summary: Menambah satu item jasa atau sparepart ke SPK
+    description: |
+      Pemilik dan kasir (mekanik → 403; mekanik melaporkan part yang
+      dibutuhkan ke kasir). Urutan:
+      1. 413 → 400 → 401 → 403 → 404 (SPK tidak ada).
+      2. Validasi badan → 422, termasuk rujukan `serviceId`/`partId`
+         (`unknown_reference`, `inactive_reference`).
+      3. Di bawah kunci baris SPK: status bukan `QUEUED`, `IN_PROGRESS`,
+         atau `WAITING_PARTS` → 409 `work_order_locked`.
+      4. SPK sudah punya 50 item → 422 `fields.items: too_many_items`.
+      5. `PART`: baris sparepart dikunci (`SELECT … FOR UPDATE`) dan
+         dibaca ulang; sudah nonaktif → 422 `fields.partId:
+         inactive_reference`; `stock` < `quantity` → 409
+         `insufficient_stock` dengan pesan baku (bagian "Sparepart dan stok"
+         di deskripsi API). Tidak ada yang berubah bila ditolak.
+      6. 201 dengan rincian SPK sesudah item ditambahkan.
+
+      Berhasil, dalam transaksi yang sama:
+      - Item baru di akhir daftar. `SERVICE`: nama dan harga dari katalog
+        saat ini, kecuali `price` dikirim; harga beli 0. `PART`: nama, harga
+        jual, dan harga beli dari katalog saat ini (`price` di badan
+        diabaikan). `subtotal` = `price` × `quantity`.
+      - `PART`: `stock` berkurang `quantity` dan satu baris kartu stok
+        `USED` (`quantity` negatif, catatan kosong, nomor SPK, staf yang
+        masuk) ditambahkan. Sparepart yang sama boleh ditambahkan lagi
+        sebagai item terpisah; tiap item mengurangi stok sendiri. Dua kasir
+        yang serentak memakai stok terakhir: tepat satu berhasil, yang lain
+        409 `insufficient_stock`.
+      - `serviceSubtotal` atau `partSubtotal`, `total`, dan `updatedAt` SPK
+        dihitung ulang.
+
+      Tidak ada pesan WhatsApp.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/NomorSpkPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/spk.yaml#/TambahItemRequest'
+          examples:
+            part:
+              summary: Sparepart (harga dari katalog)
+              value:
+                type: PART
+                partId: 4f4f4f4f-0000-4000-8000-000000000002
+                quantity: 1
+            jasa:
+              summary: Jasa dengan harga lain
+              value:
+                type: SERVICE
+                serviceId: 3e3e3e3e-0000-4000-8000-000000000002
+                quantity: 1
+                price: 90000
+    responses:
+      '201':
+        description: Item ditambahkan.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+            examples:
+              dikerjakan:
+                $ref: '../components/examples/contoh.yaml#/SpkDetail'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`work_order_locked` atau `insufficient_stock`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              stokKurang:
+                $ref: '../components/examples/contoh.yaml#/GalatStokKurang'
+              terkunci:
+                $ref: '../components/examples/contoh.yaml#/GalatTerkunci'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        description: '`validation_failed`, selalu dengan `fields`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              jasaNonaktif:
+                $ref: '../components/examples/contoh.yaml#/GalatValidasiItem'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+item:
+  delete:
+    operationId: hapusItemSpk
+    tags: [SPK]
+    summary: Menghapus satu item dari SPK
+    description: |
+      Pemilik dan kasir (mekanik → 403). Tanpa badan. Urutan: 401 → 403 →
+      404 (SPK tidak ada) → 404 (item bukan milik SPK ini, atau sudah
+      dihapus) → 409 `work_order_locked` → 409 `total_below_paid` (total
+      sesudah item dihapus akan lebih kecil dari `paidAmount`) → 200 dengan
+      rincian sesudah item dihapus.
+
+      Berhasil, dalam satu transaksi dengan urutan kunci baris SPK → baris
+      sparepart: baris item dihapus; untuk `PART`, `stock` bertambah
+      `quantity` item dan satu baris kartu stok `RETURNED` ditambahkan
+      (catatan kosong, staf yang masuk), juga bila sparepart sudah
+      nonaktif; subtotal, `total`, dan `updatedAt` SPK dihitung ulang.
+      Nomor baris item lain tidak bergeser.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/NomorSpkPath'
+      - $ref: '../components/parameters/umum.yaml#/ItemId'
+    responses:
+      '200':
+        description: Item dihapus.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`work_order_locked` atau `total_below_paid`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: total_below_paid
+                message: Total SPK tidak boleh lebih kecil dari yang sudah dibayar
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+payments:
+  post:
+    operationId: catatPembayaran
+    tags: [SPK]
+    summary: Mencatat pembayaran (uang muka atau cicilan)
+    description: |
+      Pemilik dan kasir (mekanik → 403). Pembayaran hanya dicatat, tidak
+      ada pembayaran online. Uang kembalian dihitung di layar kasir dan
+      tidak dikirim ke sini.
+
+      Urutan pemeriksaan:
+      1. 413 → 400 → 401 → 403 → 404.
+      2. Validasi `amount` (tipe, wajib, minimal 1, nilai mutlak paling
+         besar 2^53−1) dan `method` → 422.
+      3. Di bawah kunci baris SPK: `CANCELLED` → 409 `work_order_cancelled`;
+         `PICKED_UP` → 409 `already_picked_up`. `QUEUED`, `IN_PROGRESS`,
+         `WAITING_PARTS`, dan `DONE` boleh dibayar (uang muka sejak SPK
+         dibuat).
+      4. `amount` lebih dari sisa tagihan (`total` − `paidAmount`) → 422
+         `fields.amount: out_of_range`. SPK yang sudah lunas (termasuk
+         bertotal 0) punya sisa 0, jadi pembayaran apa pun ditolak di sini.
+      5. Satu baris `payments` (metode, jumlah, staf yang masuk, sekarang)
+         disimpan dan `paidAmount` serta `updatedAt` SPK diperbarui, dalam
+         transaksi yang sama, sehingga pembayaran bersamaan tidak pernah
+         membuat `paidAmount` melebihi `total` → 201 dengan rincian SPK.
+
+      Pembayaran tidak pernah mengubah status (kendaraan diserahkan lewat
+      `status` `PICKED_UP`) dan tidak mengirim WhatsApp. Tidak ada void atau
+      refund.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/NomorSpkPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/spk.yaml#/BayarRequest'
+          example:
+            amount: 50000
+            method: cash
+    responses:
+      '201':
+        description: Pembayaran dicatat.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+            examples:
+              uangMuka:
+                $ref: '../components/examples/contoh.yaml#/SpkDetail'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`work_order_cancelled` atau `already_picked_up`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: work_order_cancelled
+                message: SPK ini sudah dibatalkan
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+wa:
+  post:
+    operationId: kirimWaSpk
+    tags: [SPK]
+    summary: Mengirim ulang pesan SPK, siap diambil, atau nota lewat WhatsApp
+    description: |
+      Pemilik dan kasir (mekanik → 403). Urutan: 413 → 400 → 401 → 403 →
+      404 → 422 (`type`, `phone`, dinilai sekaligus) → 409 → kirim.
+
+      - Nomor tujuan = `phone` di badan bila dikirim, selain itu nomor
+        pelanggan SPK saat ini. Nomor di badan hanya dipakai untuk
+        pengiriman ini.
+      - SPK `CANCELLED` → 409 `work_order_cancelled` untuk semua jenis.
+      - `work_order_done`: status bukan `DONE` atau `PICKED_UP` → 409
+        `work_order_not_done`.
+      - `work_order_created` dan `receipt` boleh di status apa pun selain
+        `CANCELLED` (nota bisa diminta sebelum atau sesudah lunas).
+      - Pesan disusun dengan data **saat ini** (item, pembayaran, profil
+        outlet, data pelanggan dan kendaraan, token lacak) memakai templat
+        yang sama dengan pengiriman otomatis (`whatsapp.md`), lalu dicatat
+        di `wa_messages`. Penyedia WhatsApp tidak dipanggil di dalam
+        transaksi.
+      - Terkirim → 200 dengan rincian SPK (`wa.<jenis>.status` `sent`).
+      - Gagal → 503 `wa_unavailable`; baris `failed` tetap tercatat,
+        sehingga rincian SPK sesudahnya menampilkan status `failed`.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/NomorSpkPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/spk.yaml#/KirimWaRequest'
+          example:
+            type: receipt
+    responses:
+      '200':
+        description: Pesan terkirim.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`work_order_cancelled` atau `work_order_not_done`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: work_order_not_done
+                message: SPK ini belum selesai
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+      '503':
+        $ref: '../components/responses/galat.yaml#/WaUnavailable'
+
+trackingLink:
+  post:
+    operationId: buatUlangTautanLacak
+    tags: [SPK]
+    summary: Membuat ulang tautan lacak (mematikan tautan lama)
+    description: |
+      Pemilik dan kasir (mekanik → 403). Tanpa badan (badan diabaikan).
+      Urutan: 401 → 403 → 404 → 200 dengan rincian SPK yang memuat
+      `trackingToken` baru.
+
+      Dipakai bila tautan lacak tersebar ke orang lain. Token baru dibuat
+      dengan cara yang sama seperti saat SPK dibuat dan menggantikan token
+      lama di baris SPK (dikunci), sehingga
+      `GET /api/public/work-orders/{tokenLama}` langsung 404. Boleh di
+      status apa pun. Tidak mengirim WhatsApp; kasir bisa mengirim tautan
+      baru lewat `POST /api/work-orders/{number}/wa` dengan jenis
+      `work_order_created`. Tidak menulis linimasa.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/NomorSpkPath'
+    responses:
+      '200':
+        description: Token lacak baru.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkDetail'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

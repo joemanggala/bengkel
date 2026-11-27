@@ -1,0 +1,76 @@
+# Rahasia lokal. Contoh nilai ada di .env.example masing-masing folder.
+.env
+.env.*
+!.env.example
+
+# Dependensi (Node, PHP/Composer, Go)
+node_modules/
+vendor/
+.pnpm-store/
+
+# Hasil build dan cache (Next.js, NestJS, Go, Vite, TypeScript)
+.next/
+.next-dev/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+.turbo/
+.cache/
+backend-go/bin/
+*.exe
+*.test
+*.out
+
+# Laravel: berkas yang dibuat saat berjalan
+backend-laravel/storage/*.key
+backend-laravel/storage/logs/*
+backend-laravel/storage/framework/cache/*
+backend-laravel/storage/framework/sessions/*
+backend-laravel/storage/framework/views/*
+backend-laravel/bootstrap/cache/*
+!backend-laravel/storage/**/.gitignore
+!backend-laravel/bootstrap/cache/.gitignore
+.phpunit.result.cache
+.phpunit.cache/
+
+# Hasil tes end-to-end
+test-results/
+playwright-report/
+blob-report/
+# Salinan sumber, build, log, sesi browser, dan laporan yang dibuat harness tests/e2e.
+.bangun/
+
+# Spec yang dibundel harness tes kontrak
+tests/kontrak/.spec-bundel/
+
+# Log
+*.log
+npm-debug.log*
+
+# Editor dan sistem operasi
+~$*
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Keluaran alat browser otomatis
+.playwright-mcp/
+
+# Flutter: aplikasi staf di mobile/ (menyusul; gaya sama dengan .gitignore bawaan proyek Flutter)
+mobile/.dart_tool/
+mobile/.flutter-plugins-dependencies
+mobile/.pub-cache/
+mobile/.pub/
+mobile/build/
+mobile/coverage/
+mobile/android/local.properties
+mobile/android/.gradle/
+# Kunci tanda tangan Android milik pembeli tidak boleh ikut tersimpan di git.
+mobile/android/key.properties
+*.jks
+*.keystore

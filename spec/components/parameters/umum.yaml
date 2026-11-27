@@ -1,0 +1,299 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+Page:
+  name: page
+  in: query
+  required: false
+  description: |
+    Nomor halaman, bawaan 1 bila parameter tidak dikirim. Hanya digit ASCII
+    (`^[0-9]+$`). Parameter kosong (`?page=`) atau bukan digit (`abc`, `-1`,
+    `1.5`, `+1`) → 422 `fields.page: invalid_format`; digit di luar
+    1..1.000.000 → `out_of_range`. Nilai tidak pernah dijepit diam-diam.
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 1000000
+    default: 1
+
+Limit:
+  name: limit
+  in: query
+  required: false
+  description: |
+    Jumlah baris per halaman, bawaan 20 bila tidak dikirim. Aturan sama
+    dengan `page`: kosong atau bukan digit → `invalid_format`; di luar 1..50
+    → `out_of_range`.
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 50
+    default: 20
+
+Search:
+  name: search
+  in: query
+  required: false
+  description: |
+    Dipangkas; kosong (atau tidak dikirim) berarti tanpa filter. Mencocokkan
+    sebagian teks; kolom mana yang dicocokkan tertulis di deskripsi tiap
+    rute, dan sebuah baris cocok bila **salah satu** aturan di bawah cocok.
+    Term yang memuat byte UTF-8 tidak sah (mis. `%FF`) tidak pernah cocok:
+    daftar kosong 200.
+
+    Aturan cocok:
+    - **Nama** (nama pelanggan, nama pemesan, nama jasa, nama dan SKU
+      sparepart): `kolom LIKE CONCAT('%', ?, '%')` dengan collation kolom
+      (`utf8mb4_0900_ai_ci` untuk nama, jadi huruf besar/kecil dan aksen
+      tidak membedakan; SKU dicocokkan dengan term yang huruf a-z-nya
+      dibesarkan). Karakter `%`, `_`, dan `\` dicocokkan apa adanya: ganti
+      `\` → `\\` lebih dulu, lalu `%` → `\%` dan `_` → `\_`, dengan karakter
+      escape bawaan MySQL (`\`), dan term dikirim sebagai parameter.
+    - **Nomor** (nomor SPK, nomor booking): huruf a-z di dalam term
+      dibesarkan, lalu cocok bila menjadi bagian dari nomor. Jadi `s-0001`
+      dan `0001` menemukan `S-0001`.
+    - **Nomor HP**: buang spasi dan tanda hubung dari term. Bila hasilnya
+      cocok dengan `^\+?[0-9]+$`: awalan `+62` diganti `62`, awalan `0`
+      diganti `62`, lalu cocok bila menjadi bagian dari nomor seragam. Jadi
+      `0812-34` dan `81234` sama-sama menemukan `6281234567890`. Term lain
+      tidak pernah cocok dengan nomor HP.
+    - **Plat**: buang spasi, tanda hubung, dan titik dari term, lalu
+      besarkan a-z. Bila hasilnya tidak kosong dan hanya berisi A-Z dan
+      0-9, cocok bila menjadi bagian dari kunci plat. Jadi `b 1234` dan
+      `1234x` menemukan `B 1234 XYZ`. Term lain tidak pernah cocok dengan
+      plat.
+  schema:
+    type: string
+
+IsActiveQuery:
+  name: isActive
+  in: query
+  required: false
+  description: |
+    Hanya yang aktif (`true`) atau nonaktif (`false`), dibandingkan persis
+    huruf kecil. Tidak dikirim = semua. Kosong atau nilai lain (`1`, `TRUE`)
+    → 422 `fields.isActive: invalid_format`.
+  schema:
+    type: string
+    enum: ['true', 'false']
+
+LowStockQuery:
+  name: lowStock
+  in: query
+  required: false
+  description: |
+    `true` = hanya sparepart yang perlu dibeli: `stock` <= `minStock`
+    (`stockLevel` `low` atau `out`). `false` = hanya `stock` > `minStock`.
+    Tidak dikirim = semua. Dibandingkan persis huruf kecil; kosong atau
+    nilai lain → 422 `fields.lowStock: invalid_format`.
+  schema:
+    type: string
+    enum: ['true', 'false']
+
+StatusSpkQuery:
+  name: status
+  in: query
+  required: false
+  description: |
+    Satu status SPK, dibandingkan persis (huruf besar). Tidak dikirim =
+    semua status. Kosong (`?status=`) atau nilai lain (termasuk `queued`) →
+    422 `fields.status: invalid_format`.
+  schema:
+    $ref: '../schemas/spk.yaml#/StatusSpk'
+
+LingkupSpk:
+  name: scope
+  in: query
+  required: false
+  description: |
+    `active` = SPK yang masih di bengkel: `QUEUED`, `IN_PROGRESS`,
+    `WAITING_PARTS`, atau `DONE` (selesai tetapi belum diambil). `history` =
+    `PICKED_UP` dan `CANCELLED`. Tidak dikirim = semua. Kosong atau nilai
+    lain → 422 `fields.scope: invalid_format`. Boleh digabung dengan
+    `status`; hasilnya irisan keduanya (mis. `scope=history&status=QUEUED`
+    → daftar kosong).
+  schema:
+    type: string
+    enum: [active, history]
+
+UrutanSpk:
+  name: sort
+  in: query
+  required: false
+  description: |
+    `newest` = `created_at` terbaru dulu, lalu `work_order_id` turun
+    (bawaan). `oldest` = `created_at` terlama dulu, lalu `work_order_id`
+    naik (antrean terlama dulu). Kosong atau nilai lain → 422
+    `fields.sort: invalid_format`.
+  schema:
+    type: string
+    enum: [newest, oldest]
+    default: newest
+
+MechanicIdQuery:
+  name: mechanicId
+  in: query
+  required: false
+  description: |
+    Hanya SPK yang ditugaskan ke mekanik ini. UUID kanonik huruf kecil;
+    kosong atau bentuk lain → 422 `fields.mechanicId: invalid_format`. UUID
+    sah yang tidak dikenal menghasilkan daftar kosong (200). **Untuk peminta
+    ber-peran `mechanic`, parameter ini diabaikan** (setelah formatnya
+    diperiksa): mekanik selalu hanya melihat SPK miliknya.
+  schema:
+    $ref: '../schemas/umum.yaml#/Uuid'
+
+StatusBookingQuery:
+  name: status
+  in: query
+  required: false
+  description: |
+    Satu status booking, dibandingkan persis. Tidak dikirim = semua. Kosong
+    atau nilai lain → 422 `fields.status: invalid_format`.
+  schema:
+    $ref: '../schemas/booking.yaml#/StatusBooking'
+
+TanggalDatangQuery:
+  name: visitDate
+  in: query
+  required: false
+  description: |
+    Hanya booking dengan tanggal datang ini (`YYYY-MM-DD`). Tidak dikirim =
+    semua. Kosong, bentuk lain, atau tanggal yang tidak ada di kalender →
+    422 `fields.visitDate: invalid_format`.
+  schema:
+    $ref: '../schemas/umum.yaml#/Tanggal'
+
+TanggalFilter:
+  name: date
+  in: query
+  required: false
+  description: |
+    Hanya SPK yang `created_at`-nya jatuh di tanggal WIB (UTC+7) ini,
+    `YYYY-MM-DD`, dengan rentang waktu yang sama seperti rekap harian. Tidak
+    dikirim = semua tanggal. Kosong, bentuk lain, tanggal di luar rentang
+    `1000-01-02` sampai `9999-12-31`, atau tanggal yang tidak ada di
+    kalender → 422 `fields.date: invalid_format`.
+  schema:
+    $ref: '../schemas/umum.yaml#/Tanggal'
+
+TanggalRekap:
+  name: date
+  in: query
+  required: true
+  description: |
+    Tanggal WIB (UTC+7) yang direkap, `YYYY-MM-DD`, dari `1000-01-02` sampai
+    `9999-12-31` (jendela UTC harian harus berada di dalam rentang
+    `DATETIME` MySQL). Tidak dikirim → 422 `fields.date: required`. Kosong,
+    bentuk lain, tanggal di luar rentang, atau tanggal yang tidak ada di
+    kalender (mis. `2026-02-30`, `2026-13-01`) → `invalid_format`.
+  schema:
+    $ref: '../schemas/umum.yaml#/Tanggal'
+
+PlateQuery:
+  name: plate
+  in: query
+  required: true
+  description: |
+    Bagian plat yang dicari. Dipangkas, lalu spasi, tanda hubung, dan titik
+    dibuang dan a-z dibesarkan. Tidak dikirim, kosong, atau kosong sesudah
+    dinormalkan → 422 `fields.plate: required`; memuat karakter selain A-Z
+    dan 0-9 sesudah dinormalkan → `invalid_format`; lebih dari 12 karakter
+    → `too_long`. Boleh diawali angka (`1234` mencari bagian tengah).
+    Cocok bila hasil normalisasi menjadi bagian dari kunci plat.
+  schema:
+    type: string
+
+StaffId:
+  name: staffId
+  in: path
+  required: true
+  description: UUID kanonik huruf kecil. Bentuk lain, termasuk huruf besar, diperlakukan sebagai tidak ada (404).
+  schema:
+    $ref: '../schemas/umum.yaml#/Uuid'
+
+CustomerId:
+  name: customerId
+  in: path
+  required: true
+  description: UUID kanonik huruf kecil. Bentuk lain, termasuk huruf besar, diperlakukan sebagai tidak ada (404).
+  schema:
+    $ref: '../schemas/umum.yaml#/Uuid'
+
+VehicleId:
+  name: vehicleId
+  in: path
+  required: true
+  description: UUID kanonik huruf kecil. Bentuk lain, termasuk huruf besar, diperlakukan sebagai tidak ada (404).
+  schema:
+    $ref: '../schemas/umum.yaml#/Uuid'
+
+ServiceId:
+  name: serviceId
+  in: path
+  required: true
+  description: UUID kanonik huruf kecil. Bentuk lain, termasuk huruf besar, diperlakukan sebagai tidak ada (404).
+  schema:
+    $ref: '../schemas/umum.yaml#/Uuid'
+
+PartId:
+  name: partId
+  in: path
+  required: true
+  description: UUID kanonik huruf kecil. Bentuk lain, termasuk huruf besar, diperlakukan sebagai tidak ada (404).
+  schema:
+    $ref: '../schemas/umum.yaml#/Uuid'
+
+BookingId:
+  name: bookingId
+  in: path
+  required: true
+  description: UUID kanonik huruf kecil. Bentuk lain, termasuk huruf besar, diperlakukan sebagai tidak ada (404).
+  schema:
+    $ref: '../schemas/umum.yaml#/Uuid'
+
+ItemId:
+  name: itemId
+  in: path
+  required: true
+  description: |
+    `itemId` sebuah baris di `SpkDetail.items`. Bentuk selain UUID kanonik
+    huruf kecil, item yang tidak ada, sudah dihapus, atau milik SPK lain →
+    404.
+  schema:
+    $ref: '../schemas/umum.yaml#/Uuid'
+
+NomorSpkPath:
+  name: number
+  in: path
+  required: true
+  description: |
+    Nomor SPK, dicocokkan persis. Wajib cocok dengan `^S-[0-9]{4,}$`;
+    selain itu (termasuk `s-0001` dan `S-1`) diperlakukan sebagai tidak ada
+    (404).
+  schema:
+    $ref: '../schemas/spk.yaml#/NomorSpk'
+
+BookingToken:
+  name: bookingToken
+  in: path
+  required: true
+  description: |
+    Token booking dari `BookingDibuat.bookingToken`. Database mencarinya
+    lewat hash SHA-256 (hex huruf kecil atas byte ASCII token). Bentuk
+    selain 43 karakter `[A-Za-z0-9_-]` dan token yang tidak dikenal
+    sama-sama 404.
+  schema:
+    $ref: '../schemas/umum.yaml#/TokenPublik'
+
+TrackingToken:
+  name: trackingToken
+  in: path
+  required: true
+  description: |
+    Token lacak SPK (`SpkDetail.trackingToken`), dicocokkan persis dengan
+    `work_orders.tracking_token`. Bentuk selain 43 karakter
+    `[A-Za-z0-9_-]`, token yang tidak dikenal, dan token lama sesudah dibuat
+    ulang sama-sama 404.
+  schema:
+    $ref: '../schemas/umum.yaml#/TokenPublik'

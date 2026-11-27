@@ -1,0 +1,188 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+JasaTerlaris:
+  type: object
+  additionalProperties: false
+  required: [serviceId, name, quantity, revenue]
+  properties:
+    serviceId:
+      $ref: './umum.yaml#/Uuid'
+    name:
+      type: string
+      description: Nama jasa **saat ini** (bukan salinan di item), supaya jasa yang diganti namanya tetap satu baris.
+    quantity:
+      type: integer
+      minimum: 1
+      description: Jumlah `quantity` item jasa itu.
+    revenue:
+      type: integer
+      minimum: 0
+      description: Jumlah `subtotal` item jasa itu.
+
+PartTerlaris:
+  type: object
+  additionalProperties: false
+  required: [partId, name, quantity, revenue, cost, profit]
+  properties:
+    partId:
+      $ref: './umum.yaml#/Uuid'
+    name:
+      type: string
+      description: Nama sparepart **saat ini**.
+    quantity:
+      type: integer
+      minimum: 1
+    revenue:
+      type: integer
+      minimum: 0
+      description: Jumlah `subtotal` item part itu.
+    cost:
+      type: integer
+      minimum: 0
+      description: Jumlah harga beli × `quantity`, dengan harga beli **saat part ditambahkan ke SPK**.
+    profit:
+      type: integer
+      description: '`revenue` − `cost`. Negatif bila modalnya lebih besar.'
+
+SelesaiPerMekanik:
+  type: object
+  additionalProperties: false
+  required: [mechanic, doneCount]
+  properties:
+    mechanic:
+      description: Mekanik yang tertera di SPK, atau `null` untuk SPK selesai tanpa mekanik.
+      oneOf:
+        - $ref: './staf.yaml#/StafRingkas'
+        - type: 'null'
+    doneCount:
+      type: integer
+      minimum: 1
+
+RekapHarian:
+  type: object
+  description: |
+    Rekap satu tanggal WIB. Rentang waktunya dalam UTC adalah
+    `[tanggal − 1 hari 17:00:00.000, tanggal 17:00:00.000)`, karena data
+    disimpan UTC dan WIB = UTC+7 tanpa musim panas. Semua angka dihitung saat
+    rekap diminta.
+
+    **SPK selesai hari itu** = SPK yang baris linimasa `DONE`-nya
+    `created_at`-nya jatuh di tanggal itu. Tiap SPK paling banyak punya satu
+    baris `DONE` (status `DONE` tidak bisa mundur atau dibatalkan), dan item
+    SPK terkunci sejak `DONE`, jadi angka nilai, modal, dan laba sebuah
+    tanggal tidak berubah lagi sesudah hari itu lewat. SPK batal tidak
+    pernah sampai `DONE`, jadi tidak pernah dihitung di nilai SPK.
+
+    Laba kotor = nilai jasa + nilai part − modal part. Jasa bermodal 0.
+    Modal part memakai harga beli **saat part ditambahkan ke SPK**. Item part
+    dengan harga beli 0 dihitung bermodal 0 dan dihitung di
+    `partItemsWithoutCost`, supaya web bisa menampilkan catatan "Harga beli
+    belum lengkap" seperti kafe-resto.
+  additionalProperties: false
+  required:
+    - date
+    - workOrderCount
+    - doneCount
+    - pickedUpCount
+    - cancelledCount
+    - serviceTotal
+    - partTotal
+    - salesTotal
+    - partCostTotal
+    - grossProfit
+    - partItemsWithoutCost
+    - paymentTotal
+    - paymentsByMethod
+    - topServices
+    - topParts
+    - doneByMechanic
+  properties:
+    date:
+      $ref: './umum.yaml#/Tanggal'
+    workOrderCount:
+      type: integer
+      minimum: 0
+      description: SPK masuk, yaitu SPK yang `created_at`-nya jatuh di tanggal itu dan statusnya sekarang bukan `CANCELLED`.
+    doneCount:
+      type: integer
+      minimum: 0
+      description: Jumlah SPK selesai hari itu.
+    pickedUpCount:
+      type: integer
+      minimum: 0
+      description: Jumlah baris linimasa `PICKED_UP` yang jatuh di tanggal itu (kendaraan diambil hari itu).
+    cancelledCount:
+      type: integer
+      minimum: 0
+      description: Jumlah baris linimasa `CANCELLED` yang jatuh di tanggal itu (hanya informasi; uangnya tidak dihitung).
+    serviceTotal:
+      type: integer
+      minimum: 0
+      description: Jumlah `serviceSubtotal` SPK selesai hari itu.
+    partTotal:
+      type: integer
+      minimum: 0
+      description: Jumlah `partSubtotal` SPK selesai hari itu.
+    salesTotal:
+      type: integer
+      minimum: 0
+      description: '`serviceTotal` + `partTotal` (nilai SPK).'
+    partCostTotal:
+      type: integer
+      minimum: 0
+      description: Modal part SPK selesai hari itu, jumlah harga beli × `quantity` semua item part.
+    grossProfit:
+      type: integer
+      description: '`salesTotal` − `partCostTotal`. Negatif bila modalnya lebih besar.'
+    partItemsWithoutCost:
+      type: integer
+      minimum: 0
+      description: Jumlah baris item part di SPK selesai hari itu yang harga belinya 0. Lebih dari 0 → web menampilkan "Harga beli belum lengkap".
+    paymentTotal:
+      type: integer
+      minimum: 0
+      description: Jumlah semua pembayaran yang `created_at`-nya jatuh di tanggal itu, apa pun status dan tanggal SPK-nya (uang muka ikut dihitung di hari diterimanya).
+    paymentsByMethod:
+      type: object
+      description: '`paymentTotal` dipecah per metode; metode tanpa pembayaran bernilai 0. Ketiganya selalu ada dan jumlahnya sama dengan `paymentTotal`.'
+      additionalProperties: false
+      required: [cash, transfer, qris]
+      properties:
+        cash:
+          type: integer
+          minimum: 0
+        transfer:
+          type: integer
+          minimum: 0
+        qris:
+          type: integer
+          minimum: 0
+    topServices:
+      type: array
+      maxItems: 5
+      description: |
+        Hingga 5 jasa dengan `quantity` terbanyak di SPK selesai hari itu,
+        dikelompokkan per `serviceId`. Urut `quantity` turun, lalu `revenue`
+        turun, lalu `serviceId` naik. Kosong bila tidak ada.
+      items:
+        $ref: '#/JasaTerlaris'
+    topParts:
+      type: array
+      maxItems: 5
+      description: |
+        Hingga 5 sparepart dengan `quantity` terbanyak di SPK selesai hari
+        itu, dikelompokkan per `partId`. Urut `quantity` turun, lalu
+        `revenue` turun, lalu `partId` naik. Kosong bila tidak ada.
+      items:
+        $ref: '#/PartTerlaris'
+    doneByMechanic:
+      type: array
+      description: |
+        Jumlah SPK selesai hari itu per mekanik yang tertera di SPK (mekanik
+        tidak bisa diganti sesudah `DONE`). Hanya mekanik dengan minimal satu
+        SPK selesai. Urut `doneCount` turun, lalu nama naik (collation
+        `utf8mb4_0900_ai_ci`), lalu `staffId` naik; baris `mechanic` `null`
+        (SPK selesai tanpa mekanik), bila ada, selalu terakhir.
+      items:
+        $ref: '#/SelesaiPerMekanik'

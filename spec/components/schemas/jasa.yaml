@@ -1,0 +1,159 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+NamaJasa:
+  type: string
+  description: |
+    Dipangkas. Kosong → `required`; kurang dari 2 karakter → `too_short`;
+    lebih dari 100 karakter → `too_long`. Unik tanpa membedakan huruf
+    besar/kecil dan aksen (collation `utf8mb4_0900_ai_ci`): "Ganti Oli" dan
+    "ganti oli" dianggap sama → 409 `service_name_taken`.
+  minLength: 2
+  maxLength: 100
+
+HargaJasa:
+  type: integer
+  description: |
+    Rupiah bulat, 0 sampai 100.000.000 (0 sah, mis. cek gratis). Tidak
+    dikirim atau `null` → `required`; bukan integer → `invalid_type`; di
+    luar rentang → `out_of_range`.
+  minimum: 0
+  maximum: 100000000
+
+DurasiJasa:
+  description: |
+    Perkiraan lama pengerjaan dalam menit, 1 sampai 1.440, atau `null` (=
+    tidak ditampilkan). Bukan integer → `invalid_type`; di luar rentang →
+    `out_of_range`.
+  oneOf:
+    - type: integer
+      minimum: 1
+      maximum: 1440
+    - type: 'null'
+
+DeskripsiJasa:
+  type: string
+  description: Dipangkas; boleh kosong. Lebih dari 1000 karakter → `too_long`.
+  maxLength: 1000
+
+UrutTampil:
+  type: integer
+  description: |
+    Urutan tampil, kecil dulu. Rentang 0..100.000; bukan integer →
+    `invalid_type`; di luar rentang → `out_of_range`.
+  minimum: 0
+  maximum: 100000
+
+Jasa:
+  type: object
+  description: |
+    Jasa servis untuk staf, termasuk yang nonaktif dan yang tidak tampil di
+    website. Jasa tidak pernah dihapus; yang tidak dipakai lagi dinonaktifkan.
+  additionalProperties: false
+  required: [serviceId, name, description, price, durationMinutes, isPublic, isActive, sortOrder, createdAt, updatedAt]
+  properties:
+    serviceId:
+      $ref: './umum.yaml#/Uuid'
+    name:
+      type: string
+    description:
+      type: string
+    price:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+      description: Harga katalog. Saat ditambahkan ke SPK boleh diganti harga lain.
+    durationMinutes:
+      oneOf:
+        - type: integer
+          minimum: 1
+          maximum: 1440
+        - type: 'null'
+    isPublic:
+      type: boolean
+      description: '`true` = tampil di website (`GET /api/public/services`) dan bisa dipilih saat booking, selama juga aktif.'
+    isActive:
+      type: boolean
+      description: '`false` = tidak bisa dipakai di item SPK baru maupun booking baru, dan tidak tampil di website.'
+    sortOrder:
+      type: integer
+      minimum: 0
+      maximum: 100000
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+JasaPublik:
+  type: object
+  description: Jasa seperti tampil di website.
+  additionalProperties: false
+  required: [serviceId, name, description, price, durationMinutes]
+  properties:
+    serviceId:
+      $ref: './umum.yaml#/Uuid'
+    name:
+      type: string
+    description:
+      type: string
+    price:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+    durationMinutes:
+      oneOf:
+        - type: integer
+          minimum: 1
+          maximum: 1440
+        - type: 'null'
+
+BuatJasaRequest:
+  type: object
+  description: |
+    Field lain di badan diabaikan. Opsional: `description` (bawaan string
+    kosong), `durationMinutes` (bawaan `null`), `isPublic` (bawaan `true`),
+    `isActive` (bawaan `true`), `sortOrder` (bawaan 0). `null` pada field
+    opsional selain `durationMinutes` → `invalid_type`.
+  required: [name, price]
+  properties:
+    name:
+      $ref: '#/NamaJasa'
+    description:
+      $ref: '#/DeskripsiJasa'
+    price:
+      $ref: '#/HargaJasa'
+    durationMinutes:
+      $ref: '#/DurasiJasa'
+    isPublic:
+      type: boolean
+    isActive:
+      type: boolean
+    sortOrder:
+      $ref: '#/UrutTampil'
+
+UbahJasaRequest:
+  type: object
+  description: |
+    Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
+    membalas 200 tanpa perubahan. `null` pada `name` atau `price` →
+    `required`; `null` pada `durationMinutes` = mengosongkan durasi; `null`
+    pada field lain → `invalid_type`. Mengubah nama atau harga tidak mengubah
+    SPK dan booking yang sudah ada (nama dan harga disalin). Field lain di
+    badan diabaikan.
+  properties:
+    name:
+      $ref: '#/NamaJasa'
+    description:
+      $ref: '#/DeskripsiJasa'
+    price:
+      $ref: '#/HargaJasa'
+    durationMinutes:
+      $ref: '#/DurasiJasa'
+    isPublic:
+      type: boolean
+    isActive:
+      type: boolean
+    sortOrder:
+      $ref: '#/UrutTampil'

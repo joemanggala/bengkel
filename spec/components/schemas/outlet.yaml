@@ -1,0 +1,78 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+Outlet:
+  type: object
+  description: |
+    Profil satu-satunya outlet. Dipakai halaman depan website, layar masuk
+    staf, nota, halaman lacak servis, dan pesan WhatsApp. Saat migration
+    pertama kali dijalankan: `name` "Nama Bengkel", `phone` `null`, field
+    teks lain string kosong.
+  additionalProperties: false
+  required: [name, tagline, address, phone, openingHours, mapsUrl, receiptFooter]
+  properties:
+    name:
+      type: string
+    tagline:
+      type: string
+      description: Kalimat pendek di bawah nama di halaman depan, mis. "Servis motor dan mobil, cepat dan jujur". Boleh kosong.
+    address:
+      type: string
+    phone:
+      description: Nomor WhatsApp outlet (untuk tombol WhatsApp di website), atau `null` bila belum diisi.
+      oneOf:
+        - $ref: './umum.yaml#/NomorHp'
+        - type: 'null'
+    openingHours:
+      type: string
+      description: Teks bebas, mis. "Senin–Sabtu 08.00–17.00". Boleh berisi pergantian baris (LF).
+    mapsUrl:
+      type: string
+      description: Tautan peta (mis. Google Maps), atau string kosong. Bila terisi selalu diawali `http://` atau `https://`.
+    receiptFooter:
+      type: string
+      description: Teks kaki nota, mis. "Garansi servis 7 hari". Dicetak di nota dan dikirim di pesan WhatsApp nota.
+
+UbahOutletRequest:
+  type: object
+  description: |
+    Mengganti seluruh profil, jadi semua field wajib dikirim (tidak dikirim
+    → `required`). Field lain di badan diabaikan.
+  required: [name, tagline, address, phone, openingHours, mapsUrl, receiptFooter]
+  properties:
+    name:
+      $ref: './staf.yaml#/Nama'
+    tagline:
+      type: string
+      description: Dipangkas; boleh kosong. `null` → `required`. Lebih dari 200 karakter → `too_long`.
+      maxLength: 200
+    address:
+      type: string
+      description: Dipangkas; boleh kosong dan boleh berisi pergantian baris (LF). `null` → `required`. Lebih dari 500 karakter → `too_long`.
+      maxLength: 500
+    phone:
+      description: |
+        `null` = outlet belum punya nomor WhatsApp. Selain `null`, diperiksa
+        dengan aturan `NomorHpMasukan` (string kosong → `required`).
+      oneOf:
+        - $ref: './umum.yaml#/NomorHpMasukan'
+        - type: 'null'
+    openingHours:
+      type: string
+      description: Dipangkas; boleh kosong dan boleh berisi pergantian baris (LF). `null` → `required`. Lebih dari 200 karakter → `too_long`.
+      maxLength: 200
+    mapsUrl:
+      type: string
+      description: |
+        Dipangkas; boleh kosong. `null` → `required`. Lebih dari 500 karakter
+        → `too_long`. Bila tidak kosong wajib cocok dengan
+        `^https?://[^\s]+$` (diawali `http://` atau `https://` huruf kecil,
+        tanpa spasi atau karakter kontrol di mana pun) → selain itu
+        `invalid_format`. Jadi `javascript:…` dan `www.contoh.id` ditolak.
+      maxLength: 500
+    receiptFooter:
+      type: string
+      description: |
+        Dipangkas; boleh kosong dan boleh berisi pergantian baris (LF) di
+        tengah. `null` → `required`. Lebih dari 500 karakter → `too_long`.
+      maxLength: 500

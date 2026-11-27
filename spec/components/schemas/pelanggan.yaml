@@ -1,0 +1,274 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+JenisKendaraan:
+  type: string
+  enum: [MOTOR, CAR]
+  x-label:
+    MOTOR: Motor
+    CAR: Mobil
+
+Kendaraan:
+  type: object
+  description: Satu kendaraan milik satu pelanggan. Plat unik menurut kuncinya (`plateKey`).
+  additionalProperties: false
+  required: [vehicleId, customerId, type, plate, plateKey, brand, model, year, color, createdAt, updatedAt]
+  properties:
+    vehicleId:
+      $ref: './umum.yaml#/Uuid'
+    customerId:
+      $ref: './umum.yaml#/Uuid'
+    type:
+      $ref: '#/JenisKendaraan'
+    plate:
+      $ref: './umum.yaml#/PlatTampilan'
+    plateKey:
+      $ref: './umum.yaml#/PlatKunci'
+    brand:
+      type: string
+      description: Merek, mis. "Honda".
+    model:
+      type: string
+      description: Tipe, mis. "Vario 125". Boleh kosong.
+    year:
+      description: Tahun pembuatan, atau `null` bila tidak diisi.
+      oneOf:
+        - type: integer
+          minimum: 1900
+          maximum: 2100
+        - type: 'null'
+    color:
+      type: string
+      description: Warna, boleh kosong.
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+KendaraanRingkas:
+  type: object
+  description: Kendaraan seperti tampil di daftar SPK.
+  additionalProperties: false
+  required: [vehicleId, type, plate, brand, model]
+  properties:
+    vehicleId:
+      $ref: './umum.yaml#/Uuid'
+    type:
+      $ref: '#/JenisKendaraan'
+    plate:
+      $ref: './umum.yaml#/PlatTampilan'
+    brand:
+      type: string
+    model:
+      type: string
+
+KendaraanSpk:
+  type: object
+  description: Kendaraan di rincian SPK (data kendaraan **saat ini**, bukan salinan).
+  additionalProperties: false
+  required: [vehicleId, type, plate, brand, model, year, color]
+  properties:
+    vehicleId:
+      $ref: './umum.yaml#/Uuid'
+    type:
+      $ref: '#/JenisKendaraan'
+    plate:
+      $ref: './umum.yaml#/PlatTampilan'
+    brand:
+      type: string
+    model:
+      type: string
+    year:
+      oneOf:
+        - type: integer
+          minimum: 1900
+          maximum: 2100
+        - type: 'null'
+    color:
+      type: string
+
+KendaraanPublik:
+  type: object
+  description: Kendaraan di halaman lacak servis, tanpa ID.
+  additionalProperties: false
+  required: [type, plate, brand, model]
+  properties:
+    type:
+      $ref: '#/JenisKendaraan'
+    plate:
+      $ref: './umum.yaml#/PlatTampilan'
+    brand:
+      type: string
+    model:
+      type: string
+
+Pelanggan:
+  type: object
+  description: |
+    Pelanggan seperti dilihat pemilik dan kasir, beserta semua kendaraannya
+    (urut `createdAt` naik, lalu `vehicleId` naik; kosong bila belum ada).
+  additionalProperties: false
+  required: [customerId, name, phone, address, notes, vehicles, createdAt, updatedAt]
+  properties:
+    customerId:
+      $ref: './umum.yaml#/Uuid'
+    name:
+      type: string
+    phone:
+      $ref: './umum.yaml#/NomorHp'
+    address:
+      type: string
+      description: Boleh string kosong.
+    notes:
+      type: string
+      description: Catatan internal kasir; boleh string kosong. Tidak pernah tampil di halaman publik.
+    vehicles:
+      type: array
+      items:
+        $ref: '#/Kendaraan'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+PelangganRingkas:
+  type: object
+  additionalProperties: false
+  required: [customerId, name, phone]
+  properties:
+    customerId:
+      $ref: './umum.yaml#/Uuid'
+    name:
+      type: string
+    phone:
+      $ref: './umum.yaml#/NomorHp'
+
+KendaraanDenganPemilik:
+  type: object
+  description: Hasil pencarian plat; kendaraan beserta pemiliknya.
+  additionalProperties: false
+  required: [vehicle, customer]
+  properties:
+    vehicle:
+      $ref: '#/Kendaraan'
+    customer:
+      $ref: '#/PelangganRingkas'
+
+Alamat:
+  type: string
+  description: Dipangkas; boleh kosong dan boleh berisi pergantian baris. Lebih dari 500 karakter → `too_long`.
+  maxLength: 500
+
+CatatanPelanggan:
+  type: string
+  description: Dipangkas; boleh kosong. Lebih dari 500 karakter → `too_long`.
+  maxLength: 500
+
+Merek:
+  type: string
+  description: Dipangkas. Kosong → `required`; lebih dari 50 karakter → `too_long`.
+  minLength: 1
+  maxLength: 50
+
+TipeKendaraan:
+  type: string
+  description: Dipangkas; boleh kosong. Lebih dari 50 karakter → `too_long`.
+  maxLength: 50
+
+TahunKendaraan:
+  description: |
+    Opsional. Integer 1900 sampai 2100, atau `null` (= tidak diisi). Bukan
+    integer → `invalid_type`; di luar rentang → `out_of_range`.
+  oneOf:
+    - type: integer
+      minimum: 1900
+      maximum: 2100
+    - type: 'null'
+
+Warna:
+  type: string
+  description: Dipangkas; boleh kosong. Lebih dari 30 karakter → `too_long`.
+  maxLength: 30
+
+BuatPelangganRequest:
+  type: object
+  description: |
+    Field lain di badan diabaikan. `address` dan `notes` opsional, bawaan
+    string kosong; `null` pada keduanya → `invalid_type`.
+  required: [name, phone]
+  properties:
+    name:
+      $ref: './staf.yaml#/Nama'
+    phone:
+      $ref: './umum.yaml#/NomorHpMasukan'
+    address:
+      $ref: '#/Alamat'
+    notes:
+      $ref: '#/CatatanPelanggan'
+
+UbahPelangganRequest:
+  type: object
+  description: |
+    Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
+    membalas 200 tanpa perubahan. Field yang dikirim diperiksa dengan aturan
+    yang sama seperti saat membuat pelanggan; `null` pada `name` atau
+    `phone` → `required`, `null` pada `address` atau `notes` →
+    `invalid_type`. Field lain di badan diabaikan.
+  properties:
+    name:
+      $ref: './staf.yaml#/Nama'
+    phone:
+      $ref: './umum.yaml#/NomorHpMasukan'
+    address:
+      $ref: '#/Alamat'
+    notes:
+      $ref: '#/CatatanPelanggan'
+
+BuatKendaraanRequest:
+  type: object
+  description: |
+    Field lain di badan diabaikan. `model` dan `color` opsional (bawaan
+    string kosong; `null` → `invalid_type`); `year` opsional (bawaan `null`).
+  required: [type, plate, brand]
+  properties:
+    type:
+      type: string
+      description: '`MOTOR` atau `CAR`, dibandingkan persis. Tidak dikirim, `null`, atau kosong → `required`; bukan string → `invalid_type`; nilai lain → `invalid_format`.'
+      enum: [MOTOR, CAR]
+    plate:
+      $ref: './umum.yaml#/PlatMasukan'
+    brand:
+      $ref: '#/Merek'
+    model:
+      $ref: '#/TipeKendaraan'
+    year:
+      $ref: '#/TahunKendaraan'
+    color:
+      $ref: '#/Warna'
+
+UbahKendaraanRequest:
+  type: object
+  description: |
+    Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
+    membalas 200 tanpa perubahan. `null` pada `type`, `plate`, atau `brand`
+    → `required`; `null` pada `model` atau `color` → `invalid_type`; `null`
+    pada `year` = mengosongkan tahun. Pemilik kendaraan tidak bisa diganti.
+    Field lain di badan diabaikan.
+  properties:
+    type:
+      type: string
+      enum: [MOTOR, CAR]
+    plate:
+      $ref: './umum.yaml#/PlatMasukan'
+    brand:
+      $ref: '#/Merek'
+    model:
+      $ref: '#/TipeKendaraan'
+    year:
+      $ref: '#/TahunKendaraan'
+    color:
+      $ref: '#/Warna'

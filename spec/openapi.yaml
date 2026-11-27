@@ -1,0 +1,711 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+openapi: 3.1.0
+info:
+  title: Aplikasi Bengkel API
+  version: 0.1.0
+  summary: Kontrak API website publik dan aplikasi pengelolaan bengkel motor dan mobil untuk satu outlet.
+  license:
+    name: Proprietary
+  description: |
+    Kontrak tunggal untuk semua backend yang mengimplementasikannya (Laravel
+    lebih dulu, Go dan NestJS menyusul; perilaku wajib identik), dipakai web
+    (website publik, panel pemilik, kasir, dan mekanik). Setiap respons
+    backend wajib sesuai dokumen ini; kode status atau field yang tidak
+    tertulis di sini dianggap menyimpang. Pengiriman WhatsApp dan templat
+    pesannya ada di [whatsapp.md](./whatsapp.md).
+
+    ## Format
+
+    - Awalan semua rute `/api`, tanpa nomor versi.
+    - Sukses: `{"data": ...}`. Daftar berpaginasi menambahkan
+      `"meta": {"page", "limit", "total"}`. Pengecualian: 204 tanpa badan dan
+      `GET /api/health`.
+    - Galat: `{"error": {"code", "message", "fields"?}}`, selalu JSON apa pun
+      header `Accept`-nya. `fields` hanya muncul untuk `validation_failed` dan
+      berisi kode aturan (`KodeField`). Kode yang punya pesan baku tercantum
+      di `KodeGalat.x-pesan-baku`.
+    - Semua objek respons tertutup (`additionalProperties: false`), supaya
+      tidak ada field yang hanya dikirim satu backend dan tidak ada
+      `password_hash`, `booking_token_hash`, atau `cost_price` yang bocor.
+    - Nama field JSON camelCase berbahasa Inggris. Status SPK, status
+      booking, jenis kendaraan, jenis item, dan jenis kartu stok huruf besar
+      (`IN_PROGRESS`, `MOTOR`, `PART`, `USED`); kode lain huruf kecil. Label
+      Indonesia untuk ditampilkan ada di `x-label` skema.
+    - ID berupa UUID kanonik huruf kecil yang dibuat aplikasi. Uang berupa
+      integer rupiah (tanpa pajak dan diskon di versi ini). Waktu berupa
+      `date-time` UTC; jumlah digit pecahan detik bebas, jadi jangan
+      membandingkan teks waktu secara persis.
+    - Permintaan berbadan wajib memakai `Content-Type: application/json`;
+      perilaku tanpa header itu tidak ditentukan dan tidak diuji. Badan rute
+      yang tidak menerima badan diabaikan.
+    - Rute yang tidak dikenal, dan metode yang tidak tertulis untuk path yang
+      dikenal (mis. `DELETE /api/work-orders/{number}`, `HEAD` di mana pun),
+      membalas 404 `not_found`; HEAD tanpa badan. Rute dicocokkan lebih dulu
+      dari semua pemeriksaan lain (termasuk 413 dan 400). Path dicocokkan
+      persis: garis miring di akhir (`/api/work-orders/`) atau segmen kosong
+      → 404. Segmen tetap didahulukan atas segmen berparameter
+      (`/api/staff/me` bukan `{staffId}`).
+    - Parameter query yang ditulis lebih dari sekali memakai nilai pertama
+      (tidak diuji). `+` di query berarti spasi, seperti form HTML. Titik
+      koma (`;`) di query adalah **data biasa**, bukan pemisah parameter:
+      pemisahnya hanya `&`. Jadi `search=a;b` mencari teks "a;b", dan
+      `limit=1;page=2` berarti `limit` bernilai "1;page=2" (→ 422
+      `invalid_format`).
+    - Setiap operasi bisa membalas 500 `internal_error` untuk kegagalan tak
+      terduga.
+    - Tidak ada CORS. Web memanggil backend dari server Next.js (BFF), jadi
+      tidak ada header `Access-Control-*`, dan `OPTIONS` di mana pun membalas
+      404 `not_found` seperti metode lain yang tidak tertulis.
+    - Boolean di respons selalu `true`/`false` JSON, bukan `0`/`1`.
+
+    ## Urutan pemeriksaan
+
+    Berlaku untuk semua rute; langkah yang tidak relevan dilewati, dan langkah
+    khusus tiap operasi tertulis di deskripsinya.
+
+    - Rute staf dengan badan JSON: 413 `payload_too_large` (badan lebih dari
+      1 MiB) → 400 `bad_request` (badan bukan objek JSON) → 401 → 403 (peran)
+      → 404 (sumber di path) → 403 (kepemilikan SPK oleh mekanik, hanya di
+      rute SPK yang boleh dipanggil mekanik) → 422 → 409. Jadi JSON rusak
+      tanpa token → 400, dan kasir yang mengirim JSON sah ke rute pemilik →
+      403.
+    - Rute staf tanpa badan: 401 → 403 (peran) → 404 → 403 (kepemilikan SPK)
+      → 422 (query) → langkah operasi. Badan yang dikirim ke rute ini
+      **diabaikan sepenuhnya**, termasuk JSON rusak: tidak ada 400 dan tidak
+      ada 413 (mis. `POST /api/staff/logout` dengan badan `{` tetap 204).
+    - "Badan bukan objek JSON" (→ 400) mencakup badan kosong, `null`, larik,
+      string, angka, dan boolean; hanya objek JSON `{…}` yang lolos.
+    - Rute publik: 413 → 400 → 404 (token di path) → 422 → 409. Tidak ada
+      401 dan 403, karena rute publik tidak memeriksa `Authorization`.
+
+    ## Peran dan sesi
+
+    Hanya staf yang punya sesi. Pelanggan tidak punya akun dan tidak punya
+    OTP: mereka memegang token publik (lihat "Pelanggan tanpa akun").
+
+    | Jenis | Untuk | Terbit dari | Tabel | Masa berlaku |
+    |---|---|---|---|---|
+    | staf | pemilik (`owner`), kasir (`cashier`), dan mekanik (`mechanic`) di web | `POST /api/setup`, `POST /api/staff/login` | `staff_sessions` | 30 hari, bergeser |
+
+    - **Membuat token** (satu aturan untuk semua backend, karena satu
+      database bisa dipakai bergantian): 32 byte dari pembangkit acak
+      kriptografis, dikodekan base64url **tanpa** padding, sehingga selalu
+      43 karakter `[A-Za-z0-9_-]` (skema `TokenSesi`). Bukan hex. Token
+      booking dan token lacak (`TokenPublik`) dibuat dengan cara yang sama.
+    - **Menyimpan**: kolom `token_hash` = hex huruf kecil SHA-256 atas byte
+      ASCII string token apa adanya (43 karakter itu, bukan hasil dekode
+      base64-nya). Token buatan backend mana pun, atau yang disisipkan
+      langsung ke database dengan aturan ini, wajib diterima backend lain.
+      Aturan yang sama untuk `bookings.booking_token_hash`. Pengecualian:
+      `work_orders.tracking_token` disimpan **apa adanya**, karena pesan
+      WhatsApp "siap diambil" dan nota yang dikirim belakangan harus memuat
+      tautan lacaknya (sama dengan `qr_token` meja di kafe-resto).
+    - **Membaca header**: `Authorization` = nama skema `Bearer` (tidak peka
+      huruf besar/kecil), tepat **satu** spasi U+0020, lalu token. Spasi di
+      awal dan akhir nilai header diabaikan. Bentuk lain (skema lain, tanpa
+      token, dua spasi, tab) → 401. Token yang bentuknya bukan 43 karakter
+      `[A-Za-z0-9_-]` boleh langsung ditolak 401 tanpa bertanya ke database.
+    - Rute publik (`security: []`) mengabaikan header `Authorization`
+      sepenuhnya, termasuk token yang tidak sah.
+    - Tanpa header, skema lain, token kosong, token tak dikenal, sesi lewat
+      `expires_at`, atau staf yang sudah nonaktif → 401 `unauthenticated`.
+    - Setiap permintaan terautentikasi yang lolos memperpanjang `expires_at`
+      menjadi sekarang + 30 hari dan memperbarui `last_used_at`. Penulisan
+      keduanya boleh dibatasi paling sering sekali per 5 menit (tulis bila
+      `last_used_at` lebih dari 5 menit lalu). Tes hanya memeriksa
+      perpanjangan untuk sesi yang `last_used_at`-nya sudah satu jam lalu.
+    - Peran staf dibaca dari database pada setiap permintaan, jadi perubahan
+      peran langsung berlaku. Matriks izin (✓ = boleh, selain itu 403
+      `forbidden`):
+
+      | Rute | owner | cashier | mechanic |
+      |---|---|---|---|
+      | `GET /api/staff/me`, `POST /api/staff/logout` | ✓ | ✓ | ✓ |
+      | `GET /api/services`, `GET /api/parts` | ✓ | ✓ | ✓ |
+      | `GET /api/work-orders`, `GET`/`PATCH /api/work-orders/{number}`, `POST …/status` | ✓ | ✓ | ✓ (hanya SPK miliknya, dengan batas di bawah) |
+      | `GET /api/mechanics` | ✓ | ✓ | — |
+      | Pelanggan dan kendaraan: `/api/customers…`, `/api/vehicles…` | ✓ | ✓ | — |
+      | Booking: `/api/bookings…` | ✓ | ✓ | — |
+      | `POST /api/work-orders`, `POST …/cancel`, `…/items`, `DELETE …/items/{itemId}`, `…/payments`, `…/wa`, `…/tracking-link` | ✓ | ✓ | — |
+      | `GET`/`POST /api/staff`, `PATCH /api/staff/{staffId}` | ✓ | — | — |
+      | `POST /api/services`, `PATCH /api/services/{serviceId}` | ✓ | — | — |
+      | `POST /api/parts`, `PATCH /api/parts/{partId}`, `GET …/movements`, `POST …/stock-in`, `…/stock-out`, `…/stock-count` | ✓ | — | — |
+      | `PUT /api/outlet`, `GET /api/reports/daily` | ✓ | — | — |
+
+    - **Batas mekanik** (selain matriks di atas): mekanik hanya melihat dan
+      mengubah SPK yang `mechanic`-nya dia sendiri. Daftar SPK otomatis
+      tersaring; rincian, `PATCH`, dan `status` untuk SPK lain (termasuk SPK
+      tanpa mekanik) → 403 `forbidden`, dinilai sesudah 404. Di `PATCH`
+      mekanik hanya boleh mengirim `diagnosis` (kunci lain → 403). Di
+      `status` mekanik hanya boleh menuju `IN_PROGRESS`, `WAITING_PARTS`,
+      atau `DONE` (`PICKED_UP` → 403, dinilai sesudah 422). Item, pembayaran,
+      pembatalan, dan WhatsApp tetap di kasir.
+    - **Harga beli (modal) adalah rahasia pemilik.** `costPrice` hanya ada di
+      sparepart bila yang meminta pemilik (`SparepartPemilik`); untuk kasir
+      dan mekanik kuncinya **tidak ada sama sekali** (`SparepartStaf`:
+      bukan `null`, bukan 0). Harga beli yang disalin ke item SPK tidak
+      pernah ada di respons SPK untuk siapa pun, di halaman publik, nota,
+      maupun pesan WhatsApp. Modal dan laba hanya ada di
+      `GET /api/reports/daily` (khusus pemilik). Kasir dan mekanik tetap
+      melihat stok sparepart (kasir perlu tahu part tersedia sebelum
+      menambahkannya).
+
+    ## Pelanggan tanpa akun
+
+    Pelanggan booking dan melacak servis tanpa mendaftar. Ada dua token
+    publik, keduanya `TokenPublik`, dan masing-masing hanya membuka satu hal:
+
+    | Token | Diberikan | Membuka | Disimpan sebagai |
+    |---|---|---|---|
+    | `bookingToken` | **sekali**, di balasan `POST /api/public/bookings` | melihat dan membatalkan **satu booking** itu | hash SHA-256 (`bookings.booking_token_hash`) |
+    | `trackingToken` | di tautan pesan WhatsApp SPK dan di rincian SPK untuk staf | melihat status dan nota **satu SPK** itu (hanya baca) | apa adanya (`work_orders.tracking_token`), bisa dibuat ulang kasir |
+
+    - Form booking bisa diisi siapa saja; karena itu booking mulai
+      `PENDING` dan **harus diterima staf**, paling banyak **3 booking
+      menunggu per nomor HP** (409 `too_many_pending_bookings`), dan **tidak
+      ada WhatsApp otomatis dari form publik**: pesan pertama dikirim saat
+      staf mengonfirmasi atau menolak. Pembatasan per alamat IP dipasang di
+      proxy, bukan di aplikasi.
+    - Respons publik (`BookingPublik`, `SpkPublik`) sengaja tidak memuat ID,
+      nama staf, nama mekanik, catatan internal, diagnosis, harga beli,
+      status WhatsApp, maupun token, dan nomor HP selalu disamarkan
+      (`NomorHpSamaran`: `6281****7890`). Satu-satunya teks staf yang tampil
+      adalah alasan tolak booking dan alasan batal SPK.
+
+    ## Permintaan serentak
+
+    Kasir, pemilik, mekanik, dan pelanggan memakai backend yang sama pada
+    saat yang sama, jadi aturan berikut wajib dipenuhi, termasuk saat
+    permintaan dikirim bersamaan:
+
+    - **Deadlock bukan 500.** Transaksi yang gagal karena deadlock MySQL
+      (errno 1213) atau batas tunggu kunci (errno 1205) diulang dari awal,
+      paling banyak 3 kali, sebelum menyerah menjadi 500.
+    - **Urutan kunci.** Transaksi yang butuh lebih dari satu kunci
+      mengambilnya selalu dalam urutan yang sama: baris `outlet` → baris
+      booking → baris pelanggan → baris kendaraan → baris `counters` →
+      baris SPK → baris sparepart (urut `partId` naik). Baris `outlet` hanya
+      dikunci pemasangan awal dan perubahan staf. Membuat booking hanya
+      mengunci `counters` `booking_number`; membuat SPK hanya `counters`
+      `work_order_number`; item, hapus item, dan pembatalan mengunci SPK lalu
+      sparepart; stok masuk, keluar, dan hitung ulang hanya sparepart itu.
+    - **Penyedia WhatsApp tidak pernah dipanggil di dalam transaksi**, supaya
+      kunci baris tidak ditahan selama sampai 10 detik menunggu jaringan.
+    - **Mengubah staf saling eksklusif.** `POST /api/staff` dan
+      `PATCH /api/staff/{staffId}` mengunci baris `outlet` lebih dulu. Dua
+      pemilik terakhir yang saling menurunkan serentak menghasilkan satu 200
+      dan satu 409 `last_owner` (atau 403/401), tidak pernah keduanya 200.
+    - **PATCH tidak menghapus perubahan lain.** PATCH pelanggan, kendaraan,
+      jasa, sparepart, staf, dan SPK membaca barisnya dengan `SELECT … FOR
+      UPDATE` di transaksi yang sama dengan `UPDATE`, dan `UPDATE` hanya
+      menyentuh field yang dikirim. Dua PATCH serentak yang mengubah field
+      berbeda sama-sama bertahan; PATCH sparepart tidak pernah menimpa stok.
+    - **Keunikan dijaga database.** Nomor HP pelanggan, kunci plat, nama
+      jasa, SKU, dan email staf kembar yang dibuat serentak menghasilkan satu
+      201/200 dan sisanya 409; galat kunci ganda MySQL (errno 1062)
+      dipetakan ke kode 409 yang sesuai, bukan 500.
+    - **Galat sesudah commit bukan 500.** Bila transaksi sudah di-commit,
+      balasannya tetap 2xx dengan data yang tersimpan, walau mengirim atau
+      mencatat pesan WhatsApp sesudahnya gagal. Galat itu hanya dicatat di
+      log.
+    - **Log.** Galat 500 dicatat hanya dengan kode atau errno galatnya (dan
+      rute), tidak dengan SQL beserta nilainya, badan permintaan, isi pesan
+      WhatsApp, token (sesi, booking, maupun lacak), atau nomor HP.
+
+    ## Tipe JSON
+
+    - Tipe wajib persis seperti skema; pelanggaran → 422 `invalid_type` di
+      field itu.
+    - Integer = angka JSON bernilai bulat: `15000`, `15000.0`, dan `1.5e4`
+      sah; `1500.5` dan `"15000"` tidak.
+    - Untuk field integer, angka JSON yang nilai mutlaknya lebih dari 2^53−1
+      (9.007.199.254.740.991), termasuk `1e400`, → `out_of_range`, tanpa
+      menilai apakah ia bulat. Angka apa pun di field bertipe lain →
+      `invalid_type`.
+    - Boolean hanya `true`/`false`; `1`, `0`, dan `"true"` tidak sah.
+    - `null` hanya sah untuk field yang skemanya menerima `null` (tertulis di
+      field itu). Field wajib yang `null` → `required`; field opsional lain
+      yang `null` → `invalid_type`; field opsional yang tidak dikirim →
+      nilai bawaannya. Aturan `null` untuk `PATCH` tertulis di skema
+      permintaannya.
+    - Field yang tidak dikenal di badan permintaan diabaikan.
+    - Badan JSON yang memuat byte UTF-8 tidak sah, surrogat tunggal dalam
+      escape (`\ud800` tanpa pasangan), atau bersarang lebih dari 64 tingkat
+      → 400 `bad_request`, sama dengan JSON rusak. Teks tidak boleh diam-diam
+      diganti U+FFFD.
+
+    ## Teks
+
+    - "Dipangkas" = membuang spasi, tab, CR, dan LF di awal dan akhir.
+      Kekosongan dinilai setelah dipangkas; field yang tidak dipangkas
+      (sandi, token) dinilai apa adanya. Fungsi "trim Unicode" bawaan bahasa
+      (mis. `strings.TrimSpace` di Go, `trim()` di JavaScript) tidak boleh
+      dipakai begitu saja: NBSP dan spasi lebar penuh **tidak** dibuang.
+    - Panjang teks dihitung dalam code point Unicode, kecuali `password` yang
+      dihitung dalam byte UTF-8, dinilai **sesudah** dipangkas.
+    - Field pilihan tetap (`role`, `type`, `status`, `method`, `vehicleType`,
+      dan sejenisnya) **tidak** dipangkas: string kosong `""` → `required`,
+      sedangkan `"  "` bukan kosong sehingga → `invalid_format`.
+    - Pola regex dan pilihan enum dicocokkan peka huruf, terhadap seluruh
+      string: `$` berarti akhir string yang sebenarnya, jadi `"S-0001\n"`
+      tidak cocok dengan `^S-[0-9]{4,}$` (di PHP pakai `\z` atau pengubah `D`).
+    - **Karakter kontrol di teks bebas dari form publik.** `customerName`,
+      `vehicleBrand`, dan `vehicleModel` di `POST /api/public/bookings`
+      ditolak `invalid_format` bila (sesudah dipangkas dan sesudah `too_long`
+      lolos) memuat karakter kontrol U+0000-U+001F, U+007F, atau
+      U+0080-U+009F; pemisah baris U+2028 atau U+2029; atau pengatur arah
+      teks U+202A-U+202E atau U+2066-U+2069. `complaint` booking memakai
+      aturan yang sama kecuali boleh memuat tab, LF, dan CR. Alasannya: teks
+      itu tampil di panel staf dan disalin ke pelanggan dan SPK.
+
+    ## Nomor HP dan plat
+
+    - **Nomor HP** pelanggan Indonesia: masukan menerima `08…`, `+628…`,
+      atau `628…`, boleh dengan spasi dan tanda hubung, lalu disimpan dan
+      dibalas dalam bentuk seragam `628…` dengan panjang 10–15 digit
+      (`0812-3456-7890` → `6281234567890`). Aturan lengkap, contoh, dan kode
+      galatnya ada di skema `NomorHpMasukan`. Nomor pelanggan unik (409
+      `phone_taken`); nomor di booking tidak unik.
+    - **Plat**: kunci = huruf besar tanpa spasi, tanda hubung, dan titik,
+      2–12 karakter A-Z/0-9, diawali huruf (`b 1234-xyz` → `B1234XYZ`);
+      tampilan = huruf depan, angka, huruf belakang dipisah satu spasi
+      (`B 1234 XYZ`), atau kunci apa adanya bila tidak mengikuti pola itu.
+      Aturan lengkap dan contohnya ada di skema `PlatMasukan`. Satu kunci
+      plat hanya milik satu kendaraan dan satu kendaraan hanya milik satu
+      pelanggan (409 `plate_taken`). Pencarian plat memakai kunci, jadi
+      `b1234` menemukan `B 1234 XYZ`.
+
+    ## Status SPK
+
+    | Dari | Ke | Siapa | Syarat |
+    |---|---|---|---|
+    | (baru) | `QUEUED` Antre | kasir | SPK dibuat atau booking dijadikan SPK |
+    | `QUEUED` | `IN_PROGRESS` Dikerjakan | kasir, mekanik pemilik SPK | — |
+    | `IN_PROGRESS` | `WAITING_PARTS` Menunggu part | kasir, mekanik pemilik SPK | — |
+    | `WAITING_PARTS` | `IN_PROGRESS` | kasir, mekanik pemilik SPK | — |
+    | `IN_PROGRESS` | `DONE` Selesai | kasir, mekanik pemilik SPK | minimal satu item (409 `work_order_empty`) |
+    | `DONE` | `PICKED_UP` Diambil | kasir | sisa tagihan 0 (409 `not_paid_off`) |
+    | `QUEUED`, `IN_PROGRESS`, `WAITING_PARTS` | `CANCELLED` Dibatalkan | kasir (`/cancel`) | alasan wajib; belum ada pembayaran (409 `has_payments`); semua part kembali ke stok |
+
+    "Kasir" di tabel ini berarti pemilik dan kasir. Perpindahan lain,
+    termasuk ke status yang sama, → 409 `status_transition_invalid`. Setiap
+    perpindahan dicatat sebagai linimasa (status lama, baru, staf, catatan,
+    waktu). Item dan data SPK (`PATCH`) hanya bisa diubah selama `QUEUED`,
+    `IN_PROGRESS`, atau `WAITING_PARTS` (409 `work_order_locked`), jadi
+    nilai SPK tetap sejak `DONE`. Pesan WhatsApp otomatis: `work_order_created`
+    saat SPK dibuat dan `work_order_done` saat menjadi `DONE`.
+
+    ## Status booking
+
+    | Dari | Ke | Siapa | Rute |
+    |---|---|---|---|
+    | (baru) | `PENDING` Menunggu | pelanggan | `POST /api/public/bookings` |
+    | `PENDING` | `CONFIRMED` Dikonfirmasi | kasir | `…/confirm` (WhatsApp `booking_confirmed`) |
+    | `PENDING`, `CONFIRMED` | `CONVERTED` Jadi SPK | kasir | `…/convert` (WhatsApp `work_order_created`) |
+    | `PENDING`, `CONFIRMED` | `REJECTED` Ditolak | kasir, wajib alasan | `…/reject` (WhatsApp `booking_rejected`) |
+    | `PENDING` | `CANCELLED` Dibatalkan | pelanggan | `POST /api/public/bookings/{bookingToken}/cancel` |
+
+    Selain itu → 409 `booking_transition_invalid`. Tanggal datang hari ini
+    sampai 30 hari ke depan menurut tanggal WIB. Booking tidak membatasi
+    kapasitas per hari; staf mengaturnya lewat konfirmasi.
+
+    ## SPK, uang, dan pembayaran
+
+    - Item: `subtotal` = `price` × `quantity` (1–99 per item, paling banyak
+      50 item per SPK). Nama, harga jual, dan harga beli (part) disalin ke
+      item, sehingga perubahan katalog tidak mengubah SPK lama maupun
+      labanya. Harga jasa boleh diisi lain saat ditambahkan (≥ 0); harga part
+      selalu harga jual katalog. Jasa dan sparepart nonaktif tidak bisa
+      dipakai di item baru (422 `inactive_reference`).
+    - `serviceSubtotal` = jumlah `subtotal` item `SERVICE`; `partSubtotal` =
+      jumlah item `PART`; `total` = keduanya dijumlahkan; `remainingAmount`
+      = `total` − `paidAmount`. Tanpa diskon dan pajak.
+    - Nomor SPK `S-0001` dan booking `B-0001` berurutan terus untuk outlet,
+      tidak direset per hari, dibuat dalam transaksi dengan penguncian baris
+      `counters` supaya dua kasir tidak mendapat nomor yang sama dan tidak
+      ada celah.
+    - Pembayaran `cash` | `transfer` | `qris`, boleh beberapa kali sejak SPK
+      dibuat (uang muka), jumlahnya 1 sampai sisa tagihan (melebihi → 422),
+      tidak bisa untuk SPK `CANCELLED` atau `PICKED_UP` (409). Uang kembalian
+      hanya dihitung di layar kasir. Status bayar turunan `unpaid` |
+      `partial` | `paid` (`StatusBayar`). Tidak ada void atau refund.
+    - Item tidak bisa dihapus bila total sesudahnya lebih kecil dari yang
+      sudah dibayar (409 `total_below_paid`). SPK tidak bisa dibatalkan bila
+      sudah ada pembayaran (409 `has_payments`).
+    - Kendaraan hanya bisa diserahkan (`PICKED_UP`) setelah lunas.
+
+    ## Sparepart dan stok
+
+    Stok sparepart selalu bilangan bulat dalam satuan jualnya dan tidak
+    pernah negatif. Setiap perubahan tercatat di kartu stok
+    (`stock_movements`) beserta stok sesudahnya, jadi jumlah semua
+    `quantity` kartu stok sebuah sparepart selalu sama dengan `stock`-nya.
+
+    - **Kapan stok berkurang.** Saat item `PART` **ditambahkan** ke SPK
+      (`USED`), bukan saat SPK selesai: part sudah keluar dari rak begitu
+      dipasang. Dua item sparepart yang sama di satu SPK mengurangi stok dua
+      kali.
+    - **Kapan kembali.** Saat item `PART` dihapus (`RETURNED` sebesar
+      jumlah item itu) atau SPK dibatalkan (`RETURNED` per sparepart sebesar
+      jumlah item part yang masih ada). Perubahan status lain dan pembayaran
+      tidak menyentuh stok.
+    - **Stok kurang → ditolak.** Item part dengan `quantity` lebih besar
+      dari `stock`, dan stok keluar manual yang lebih besar dari `stock`,
+      ditolak 409 `insufficient_stock` dan tidak ada yang berubah. Pesan
+      galatnya berformat baku, angka polos tanpa pemisah ribuan:
+
+      `Stok sparepart tidak cukup: <nama> (butuh <n> <satuan>, tersedia <m> <satuan>)`
+
+      Contoh: `Stok sparepart tidak cukup: Kampas Rem Depan Vario (butuh 3 set, tersedia 2 set)`.
+    - **Keserentakan.** Baris sparepart dikunci (`SELECT … FOR UPDATE`)
+      sebelum stok dibaca, jadi dua kasir yang memakai stok terakhir
+      bersamaan tidak pernah membuat stok negatif: yang kedua melihat stok
+      sesudah yang pertama dan mendapat 409.
+    - **Jenis kartu stok**: `IN` masuk, `OUT` keluar manual (wajib
+      catatan), `COUNT` hitung ulang (stok baru, wajib catatan), `USED`
+      terpakai SPK, `RETURNED` dikembalikan dari SPK (lihat
+      `JenisPergerakan`).
+    - Stok hanya berubah lewat `stock-in`, `stock-out`, `stock-count`, dan
+      item SPK; tidak lewat `PATCH` sparepart. Sparepart nonaktif tetap bisa
+      dicatat stoknya dan tetap menerima stok kembali.
+    - **Stok menipis**: `lowStock=true` di daftar sparepart = `stock` <=
+      `minStock` (`stockLevel` `low` atau `out`).
+
+    ## Waktu
+
+    - Backend menulis dan membandingkan waktu memakai jam aplikasi dalam UTC
+      (mis. kedaluwarsa sesi). Jangan memakai `NOW()`, `UTC_TIMESTAMP()`,
+      atau `time_zone` sesi MySQL untuk itu; fungsi database hanya dipakai
+      sebagai nilai bawaan kolom.
+    - Kolom `DATETIME(3)` ditulis dengan pecahan milidetik.
+    - Tanggal dan jam untuk manusia (pesan WhatsApp, rekap harian, filter
+      `date`, batas tanggal datang booking) memakai WIB = UTC+7 tetap, tanpa
+      basis data zona waktu. `visit_date` booking disimpan sebagai `DATE`
+      WIB apa adanya.
+
+    ## Urutan bawaan daftar
+
+    - SPK: `created_at` terbaru dulu, lalu `work_order_id` turun
+      (`sort=oldest` membaliknya). Booking: `created_at` terbaru dulu, lalu
+      `booking_id` turun.
+    - Pelanggan dan staf: `name` naik (collation `utf8mb4_0900_ai_ci`,
+      diurutkan oleh database), lalu id naik. Kendaraan seorang pelanggan:
+      `created_at` naik, lalu id naik.
+    - Jasa: `sortOrder`, `name`, id naik. Sparepart: `name`, id naik. Kartu
+      stok: `createdAt` terbaru dulu, lalu `movementId` turun.
+
+    ## Env bersama backend
+
+    | Env | Wajib | Isi |
+    |---|---|---|
+    | `PORT` | ya | port HTTP |
+    | `DATABASE_URL` | ya | `mysql://user:sandi@host:port/database`; tiap backend mengubahnya ke format driver-nya |
+    | `WA_API_URL` | ya | alamat kirim **lengkap dengan path**, `http://` atau `https://`, mis. `https://api.fonnte.com/send` atau `http://localhost:8890/send`; backend mengirim `POST` ke alamat itu apa adanya (lihat `whatsapp.md`) |
+    | `WA_TOKEN` | ya | token penyedia WhatsApp, hanya karakter ASCII terlihat 0x21–0x7E (selain itu backend gagal menyala); dikirim sebagai header `Authorization: <WA_TOKEN>` persis, tanpa awalan `Bearer`, dan tidak pernah ditulis ke log, database, atau balasan API |
+    | `PUBLIC_WEB_URL` | ya | alamat website publik untuk merangkai tautan di pesan WhatsApp, mis. `https://bengkelku.id` atau `http://localhost:3800`. Wajib diawali `http://` atau `https://` dan tanpa spasi; garis miring di akhir dibuang, jadi `https://bengkelku.id/` menghasilkan tautan `https://bengkelku.id/servis/<token>` |
+    | `SETUP_TOKEN` | tidak | kosong atau tidak diisi = `POST /api/setup` mati (403). Bila diisi, minimal 16 byte |
+
+    Semua env dipangkas lebih dulu (spasi, tab, CR, dan LF di awal dan
+    akhir); nilai yang kosong sesudah dipangkas dianggap tidak diisi. Env
+    wajib yang tidak diisi, atau nilai yang tidak sah → backend gagal start
+    dengan pesan yang menyebut nama env-nya, tanpa mencetak isinya. Token
+    setup di badan permintaan **tidak** dipangkas dan dibandingkan dengan
+    nilai env yang sudah dipangkas.
+servers:
+  - url: http://localhost:8802
+    description: Backend Laravel (alamat dev bawaan)
+security:
+  - tokenStaf: []
+tags:
+  - name: Kesehatan
+    description: Tanda backend siap menerima permintaan.
+  - name: Setup
+    description: Membuat akun pemilik pertama sekali saja.
+  - name: Staf
+    description: Masuk, keluar, dan profil staf.
+  - name: Kelola Staf
+    description: Akun staf (khusus pemilik) dan daftar mekanik untuk penugasan.
+  - name: Outlet
+    description: Profil bengkel (nama, tagline, alamat, nomor WA, jam buka, peta, kaki nota).
+  - name: Publik
+    description: Website tanpa akun - daftar jasa, booking, dan lacak servis.
+  - name: Pelanggan dan Kendaraan
+    description: Pelanggan, kendaraannya, dan riwayat servis per kendaraan (pemilik dan kasir).
+  - name: Jasa
+    description: Katalog jasa servis (ubah khusus pemilik).
+  - name: Sparepart dan Stok
+    description: Sparepart, harga beli (khusus pemilik), dan kartu stok.
+  - name: Booking
+    description: Booking dari website - konfirmasi, tolak, dan jadikan SPK.
+  - name: SPK
+    description: Surat perintah kerja - status, mekanik, item, pembayaran, WhatsApp, dan tautan lacak.
+  - name: Rekap
+    description: Rekap harian dan laba kotor (khusus pemilik).
+paths:
+  /api/health:
+    $ref: paths/kesehatan.yaml#/health
+  /api/setup:
+    $ref: paths/setup.yaml#/setup
+  /api/staff/login:
+    $ref: paths/staf-auth.yaml#/login
+  /api/staff/logout:
+    $ref: paths/staf-auth.yaml#/logout
+  /api/staff/me:
+    $ref: paths/staf-auth.yaml#/me
+  /api/staff:
+    $ref: paths/staf.yaml#/staffList
+  /api/staff/{staffId}:
+    $ref: paths/staf.yaml#/staff
+  /api/mechanics:
+    $ref: paths/staf.yaml#/mechanics
+  /api/outlet:
+    $ref: paths/outlet.yaml#/outlet
+  /api/public/services:
+    $ref: paths/publik.yaml#/services
+  /api/public/bookings:
+    $ref: paths/publik.yaml#/bookings
+  /api/public/bookings/{bookingToken}:
+    $ref: paths/publik.yaml#/booking
+  /api/public/bookings/{bookingToken}/cancel:
+    $ref: paths/publik.yaml#/bookingCancel
+  /api/public/work-orders/{trackingToken}:
+    $ref: paths/publik.yaml#/workOrder
+  /api/customers:
+    $ref: paths/pelanggan.yaml#/customers
+  /api/customers/{customerId}:
+    $ref: paths/pelanggan.yaml#/customer
+  /api/customers/{customerId}/vehicles:
+    $ref: paths/pelanggan.yaml#/customerVehicles
+  /api/vehicles:
+    $ref: paths/pelanggan.yaml#/vehicles
+  /api/vehicles/{vehicleId}:
+    $ref: paths/pelanggan.yaml#/vehicle
+  /api/vehicles/{vehicleId}/work-orders:
+    $ref: paths/pelanggan.yaml#/vehicleWorkOrders
+  /api/services:
+    $ref: paths/jasa.yaml#/services
+  /api/services/{serviceId}:
+    $ref: paths/jasa.yaml#/service
+  /api/parts:
+    $ref: paths/sparepart.yaml#/parts
+  /api/parts/{partId}:
+    $ref: paths/sparepart.yaml#/part
+  /api/parts/{partId}/movements:
+    $ref: paths/sparepart.yaml#/movements
+  /api/parts/{partId}/stock-in:
+    $ref: paths/sparepart.yaml#/stockIn
+  /api/parts/{partId}/stock-out:
+    $ref: paths/sparepart.yaml#/stockOut
+  /api/parts/{partId}/stock-count:
+    $ref: paths/sparepart.yaml#/stockCount
+  /api/bookings:
+    $ref: paths/booking.yaml#/bookings
+  /api/bookings/{bookingId}:
+    $ref: paths/booking.yaml#/booking
+  /api/bookings/{bookingId}/confirm:
+    $ref: paths/booking.yaml#/confirm
+  /api/bookings/{bookingId}/reject:
+    $ref: paths/booking.yaml#/reject
+  /api/bookings/{bookingId}/convert:
+    $ref: paths/booking.yaml#/convert
+  /api/work-orders:
+    $ref: paths/spk.yaml#/workOrders
+  /api/work-orders/{number}:
+    $ref: paths/spk.yaml#/workOrder
+  /api/work-orders/{number}/status:
+    $ref: paths/spk-aksi.yaml#/status
+  /api/work-orders/{number}/cancel:
+    $ref: paths/spk-aksi.yaml#/cancel
+  /api/work-orders/{number}/items:
+    $ref: paths/spk-aksi.yaml#/items
+  /api/work-orders/{number}/items/{itemId}:
+    $ref: paths/spk-aksi.yaml#/item
+  /api/work-orders/{number}/payments:
+    $ref: paths/spk-aksi.yaml#/payments
+  /api/work-orders/{number}/wa:
+    $ref: paths/spk-aksi.yaml#/wa
+  /api/work-orders/{number}/tracking-link:
+    $ref: paths/spk-aksi.yaml#/trackingLink
+  /api/reports/daily:
+    $ref: paths/rekap.yaml#/daily
+components:
+  securitySchemes:
+    tokenStaf:
+      type: http
+      scheme: bearer
+      description: Token sesi staf dari `POST /api/setup` atau `POST /api/staff/login`.
+  schemas:
+    KodeGalat:
+      $ref: components/schemas/umum.yaml#/KodeGalat
+    KodeField:
+      $ref: components/schemas/umum.yaml#/KodeField
+    Galat:
+      $ref: components/schemas/umum.yaml#/Galat
+    Meta:
+      $ref: components/schemas/umum.yaml#/Meta
+    Kesehatan:
+      $ref: components/schemas/umum.yaml#/Kesehatan
+    Uuid:
+      $ref: components/schemas/umum.yaml#/Uuid
+    TokenPublik:
+      $ref: components/schemas/umum.yaml#/TokenPublik
+    NomorHp:
+      $ref: components/schemas/umum.yaml#/NomorHp
+    NomorHpSamaran:
+      $ref: components/schemas/umum.yaml#/NomorHpSamaran
+    NomorHpMasukan:
+      $ref: components/schemas/umum.yaml#/NomorHpMasukan
+    PlatKunci:
+      $ref: components/schemas/umum.yaml#/PlatKunci
+    PlatTampilan:
+      $ref: components/schemas/umum.yaml#/PlatTampilan
+    PlatMasukan:
+      $ref: components/schemas/umum.yaml#/PlatMasukan
+    Tanggal:
+      $ref: components/schemas/umum.yaml#/Tanggal
+    WaktuMasukan:
+      $ref: components/schemas/umum.yaml#/WaktuMasukan
+    PeranStaf:
+      $ref: components/schemas/staf.yaml#/PeranStaf
+    Staf:
+      $ref: components/schemas/staf.yaml#/Staf
+    StafRingkas:
+      $ref: components/schemas/staf.yaml#/StafRingkas
+    TokenSesi:
+      $ref: components/schemas/staf.yaml#/TokenSesi
+    AuthStaf:
+      $ref: components/schemas/staf.yaml#/AuthStaf
+    StatusSetup:
+      $ref: components/schemas/staf.yaml#/StatusSetup
+    SetupRequest:
+      $ref: components/schemas/staf.yaml#/SetupRequest
+    MasukStafRequest:
+      $ref: components/schemas/staf.yaml#/MasukStafRequest
+    BuatStafRequest:
+      $ref: components/schemas/staf.yaml#/BuatStafRequest
+    UbahStafRequest:
+      $ref: components/schemas/staf.yaml#/UbahStafRequest
+    Outlet:
+      $ref: components/schemas/outlet.yaml#/Outlet
+    UbahOutletRequest:
+      $ref: components/schemas/outlet.yaml#/UbahOutletRequest
+    JenisKendaraan:
+      $ref: components/schemas/pelanggan.yaml#/JenisKendaraan
+    Kendaraan:
+      $ref: components/schemas/pelanggan.yaml#/Kendaraan
+    KendaraanRingkas:
+      $ref: components/schemas/pelanggan.yaml#/KendaraanRingkas
+    KendaraanSpk:
+      $ref: components/schemas/pelanggan.yaml#/KendaraanSpk
+    KendaraanPublik:
+      $ref: components/schemas/pelanggan.yaml#/KendaraanPublik
+    KendaraanDenganPemilik:
+      $ref: components/schemas/pelanggan.yaml#/KendaraanDenganPemilik
+    Pelanggan:
+      $ref: components/schemas/pelanggan.yaml#/Pelanggan
+    PelangganRingkas:
+      $ref: components/schemas/pelanggan.yaml#/PelangganRingkas
+    BuatPelangganRequest:
+      $ref: components/schemas/pelanggan.yaml#/BuatPelangganRequest
+    UbahPelangganRequest:
+      $ref: components/schemas/pelanggan.yaml#/UbahPelangganRequest
+    BuatKendaraanRequest:
+      $ref: components/schemas/pelanggan.yaml#/BuatKendaraanRequest
+    UbahKendaraanRequest:
+      $ref: components/schemas/pelanggan.yaml#/UbahKendaraanRequest
+    Jasa:
+      $ref: components/schemas/jasa.yaml#/Jasa
+    JasaPublik:
+      $ref: components/schemas/jasa.yaml#/JasaPublik
+    BuatJasaRequest:
+      $ref: components/schemas/jasa.yaml#/BuatJasaRequest
+    UbahJasaRequest:
+      $ref: components/schemas/jasa.yaml#/UbahJasaRequest
+    LevelStok:
+      $ref: components/schemas/sparepart.yaml#/LevelStok
+    SparepartStaf:
+      $ref: components/schemas/sparepart.yaml#/SparepartStaf
+    SparepartPemilik:
+      $ref: components/schemas/sparepart.yaml#/SparepartPemilik
+    BuatSparepartRequest:
+      $ref: components/schemas/sparepart.yaml#/BuatSparepartRequest
+    UbahSparepartRequest:
+      $ref: components/schemas/sparepart.yaml#/UbahSparepartRequest
+    StokMasukRequest:
+      $ref: components/schemas/sparepart.yaml#/StokMasukRequest
+    StokKeluarRequest:
+      $ref: components/schemas/sparepart.yaml#/StokKeluarRequest
+    HitungStokRequest:
+      $ref: components/schemas/sparepart.yaml#/HitungStokRequest
+    JenisPergerakan:
+      $ref: components/schemas/sparepart.yaml#/JenisPergerakan
+    PergerakanStok:
+      $ref: components/schemas/sparepart.yaml#/PergerakanStok
+    StatusBooking:
+      $ref: components/schemas/booking.yaml#/StatusBooking
+    NomorBooking:
+      $ref: components/schemas/booking.yaml#/NomorBooking
+    Booking:
+      $ref: components/schemas/booking.yaml#/Booking
+    BookingPublik:
+      $ref: components/schemas/booking.yaml#/BookingPublik
+    BookingDibuat:
+      $ref: components/schemas/booking.yaml#/BookingDibuat
+    BuatBookingRequest:
+      $ref: components/schemas/booking.yaml#/BuatBookingRequest
+    TolakBookingRequest:
+      $ref: components/schemas/booking.yaml#/TolakBookingRequest
+    JadikanSpkRequest:
+      $ref: components/schemas/booking.yaml#/JadikanSpkRequest
+    HasilJadikanSpk:
+      $ref: components/schemas/booking.yaml#/HasilJadikanSpk
+    StatusSpk:
+      $ref: components/schemas/spk.yaml#/StatusSpk
+    StatusBayar:
+      $ref: components/schemas/spk.yaml#/StatusBayar
+    MetodeBayar:
+      $ref: components/schemas/spk.yaml#/MetodeBayar
+    NomorSpk:
+      $ref: components/schemas/spk.yaml#/NomorSpk
+    JenisItem:
+      $ref: components/schemas/spk.yaml#/JenisItem
+    ItemSpk:
+      $ref: components/schemas/spk.yaml#/ItemSpk
+    ItemSpkPublik:
+      $ref: components/schemas/spk.yaml#/ItemSpkPublik
+    Pembayaran:
+      $ref: components/schemas/spk.yaml#/Pembayaran
+    LogStatus:
+      $ref: components/schemas/spk.yaml#/LogStatus
+    LogStatusPublik:
+      $ref: components/schemas/spk.yaml#/LogStatusPublik
+    StatusWa:
+      $ref: components/schemas/spk.yaml#/StatusWa
+    RingkasanWa:
+      $ref: components/schemas/spk.yaml#/RingkasanWa
+    SpkRingkas:
+      $ref: components/schemas/spk.yaml#/SpkRingkas
+    SpkDetail:
+      $ref: components/schemas/spk.yaml#/SpkDetail
+    SpkPublik:
+      $ref: components/schemas/spk.yaml#/SpkPublik
+    BuatSpkRequest:
+      $ref: components/schemas/spk.yaml#/BuatSpkRequest
+    UbahSpkRequest:
+      $ref: components/schemas/spk.yaml#/UbahSpkRequest
+    UbahStatusSpkRequest:
+      $ref: components/schemas/spk.yaml#/UbahStatusSpkRequest
+    BatalSpkRequest:
+      $ref: components/schemas/spk.yaml#/BatalSpkRequest
+    TambahItemRequest:
+      $ref: components/schemas/spk.yaml#/TambahItemRequest
+    BayarRequest:
+      $ref: components/schemas/spk.yaml#/BayarRequest
+    JenisPesanWaSpk:
+      $ref: components/schemas/spk.yaml#/JenisPesanWaSpk
+    KirimWaRequest:
+      $ref: components/schemas/spk.yaml#/KirimWaRequest
+    RekapHarian:
+      $ref: components/schemas/rekap.yaml#/RekapHarian

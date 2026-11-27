@@ -1,0 +1,114 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+BadRequest:
+  description: '`bad_request`: badan bukan JSON yang bisa diurai, bukan objek JSON, atau memuat byte UTF-8 tidak sah.'
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/umum.yaml#/Galat'
+      example:
+        error:
+          code: bad_request
+          message: Badan permintaan tidak bisa dibaca
+
+Unauthenticated:
+  description: '`unauthenticated`: tanpa `Authorization: Bearer`, token tidak dikenal, sesi sudah habis, atau staf sudah nonaktif.'
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/umum.yaml#/Galat'
+      example:
+        error:
+          code: unauthenticated
+          message: Autentikasi tidak sah atau sudah berakhir
+
+Forbidden:
+  description: '`forbidden`: peran peminta tidak boleh memanggil rute ini (lihat matriks izin di deskripsi API).'
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/umum.yaml#/Galat'
+      example:
+        error:
+          code: forbidden
+          message: Kamu tidak punya akses ke sumber ini
+
+NotFound:
+  description: '`not_found`: sumber tidak ada, atau token publik tidak dikenal.'
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/umum.yaml#/Galat'
+      example:
+        error:
+          code: not_found
+          message: Data tidak ditemukan
+
+PayloadTooLarge:
+  description: '`payload_too_large`: badan JSON lebih dari 1 MiB (1.048.576 byte).'
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/umum.yaml#/Galat'
+      example:
+        error:
+          code: payload_too_large
+          message: Badan permintaan terlalu besar
+
+Unprocessable:
+  description: '`validation_failed`, selalu dengan `fields`.'
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/umum.yaml#/Galat'
+      example:
+        error:
+          code: validation_failed
+          message: Data yang dikirim belum valid
+          fields:
+            phone: invalid_format
+            plate: too_short
+
+TooManyLoginAttempts:
+  description: '`too_many_requests`: email yang sama sudah dicoba masuk 10 kali berturut-turut tanpa berhasil; dikunci 15 menit sejak percobaan ke-10.'
+  headers:
+    Retry-After:
+      required: true
+      description: |
+        Sisa detik sampai percobaan masuk untuk email itu boleh diulang,
+        dibulatkan ke atas. Selalu bilangan bulat 1–900.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 900
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/umum.yaml#/Galat'
+      example:
+        error:
+          code: too_many_requests
+          message: Terlalu sering, silakan tunggu sebentar lalu coba lagi
+
+InternalError:
+  description: '`internal_error`: kegagalan tak terduga di backend. Pemeriksa kontrak otomatis tidak pernah mengharapkannya.'
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/umum.yaml#/Galat'
+      example:
+        error:
+          code: internal_error
+          message: Terjadi kesalahan di server, silakan coba lagi
+
+WaUnavailable:
+  description: '`wa_unavailable`: penyedia WhatsApp menolak pesan, tidak bisa dihubungi, atau waktu habis (lihat `whatsapp.md`). Percobaan yang gagal tetap tercatat.'
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/umum.yaml#/Galat'
+      example:
+        error:
+          code: wa_unavailable
+          message: WhatsApp tidak bisa dikirim saat ini, coba lagi nanti

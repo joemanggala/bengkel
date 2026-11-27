@@ -1,0 +1,99 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+# Layanan lokal aplikasi bengkel. "docker compose up -d mysql" hanya menyalakan MySQL; runner
+# migration berada di profil "alat" sehingga hanya jalan bila dipanggil dengan
+# "docker compose run --rm migrate-dev ..." (lihat docs/menjalankan.md).
+#
+# Image dipatok dengan tag dan digest supaya semua orang memakai byte yang sama, walau tag
+# resmi sesekali dibangun ulang. Digest-nya sama dengan produk laundry, tokoonline, dan
+# kafe-resto, jadi image yang sudah diunduh dipakai ulang.
+name: bengkel
+
+services:
+  mysql:
+    image: mysql:8.4.10@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6
+    environment:
+      # Kredensial ini khusus database lokal di laptop, bukan kunci server.
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: bengkel
+      MYSQL_PASSWORD: bengkel
+    ports:
+      # Bukan 3306 (MySQL bawaan Laragon/XAMPP), 3310 (laundry), 3320 (tokoonline), 3330
+      # (kafe-resto), atau 3340 (SIAKAD) supaya tidak bentrok dengan produk lain di laptop yang
+      # sama. Diikat ke 127.0.0.1: sandi root dan bengkel di sini sengaja sederhana (hanya
+      # untuk laptop), jadi MySQL tidak boleh terjangkau dari jaringan. Docker membuka port ke
+      # semua antarmuka bila awalan ini dihapus, dan firewall (mis. UFW) tidak menghalanginya.
+      - "127.0.0.1:3350:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Lewat TCP, karena selama inisialisasi image menyalakan server sementara tanpa jaringan;
+      # ping baru berhasil setelah server sungguhan (dan database dari db/init) siap.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ubengkel -pbengkel --silent"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  migrate-dev:
+    image: migrate/migrate:v4.20.1@sha256:76cc2074cb6642631f34a898ced71e6aeaa6b1a4d78c4daa743275a22e0c5be7
+    profiles: ["alat"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/migrations:ro
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      # multiStatements wajib: satu berkas migration berisi banyak pernyataan.
+      - -database=mysql://bengkel:bengkel@tcp(mysql:3306)/bengkel?multiStatements=true
+    command: ["up"]
+
+  # Database uji per backend, supaya suite Go, Laravel, dan NestJS bisa berjalan bersamaan
+  # tanpa saling mengosongkan tabel.
+  migrate-uji:
+    image: migrate/migrate:v4.20.1@sha256:76cc2074cb6642631f34a898ced71e6aeaa6b1a4d78c4daa743275a22e0c5be7
+    profiles: ["alat"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/migrations:ro
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      - -database=mysql://bengkel:bengkel@tcp(mysql:3306)/bengkel_uji?multiStatements=true
+    command: ["up"]
+
+  migrate-uji-laravel:
+    image: migrate/migrate:v4.20.1@sha256:76cc2074cb6642631f34a898ced71e6aeaa6b1a4d78c4daa743275a22e0c5be7
+    profiles: ["alat"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/migrations:ro
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      - -database=mysql://bengkel:bengkel@tcp(mysql:3306)/bengkel_uji_laravel?multiStatements=true
+    command: ["up"]
+
+  migrate-uji-nestjs:
+    image: migrate/migrate:v4.20.1@sha256:76cc2074cb6642631f34a898ced71e6aeaa6b1a4d78c4daa743275a22e0c5be7
+    profiles: ["alat"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/migrations:ro
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      - -database=mysql://bengkel:bengkel@tcp(mysql:3306)/bengkel_uji_nestjs?multiStatements=true
+    command: ["up"]
+
+volumes:
+  mysqldata:

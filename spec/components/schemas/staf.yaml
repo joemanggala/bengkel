@@ -1,0 +1,175 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+PeranStaf:
+  type: string
+  description: |
+    `owner` = pemilik, `cashier` = kasir atau admin bengkel, `mechanic` =
+    mekanik (hanya melihat dan mengerjakan SPK yang ditugaskan kepadanya).
+  enum: [owner, cashier, mechanic]
+  x-label:
+    owner: Pemilik
+    cashier: Kasir
+    mechanic: Mekanik
+
+Staf:
+  type: object
+  additionalProperties: false
+  required: [staffId, name, email, role, isActive, createdAt]
+  properties:
+    staffId:
+      $ref: './umum.yaml#/Uuid'
+    name:
+      type: string
+    email:
+      type: string
+      description: Selalu ASCII huruf kecil.
+    role:
+      $ref: '#/PeranStaf'
+    isActive:
+      type: boolean
+    createdAt:
+      type: string
+      format: date-time
+
+StafRingkas:
+  type: object
+  description: Staf yang melakukan sesuatu (membuat SPK, mencatat pembayaran, mengubah status) atau mekanik yang ditugaskan.
+  additionalProperties: false
+  required: [staffId, name]
+  properties:
+    staffId:
+      $ref: './umum.yaml#/Uuid'
+    name:
+      type: string
+
+TokenSesi:
+  type: string
+  description: |
+    32 byte acak dari pembangkit kriptografis, dalam base64url tanpa padding
+    (43 karakter). Database hanya menyimpan hex SHA-256 huruf kecil dari
+    token ini. Kirim kembali sebagai `Authorization: Bearer <token>`.
+  pattern: '^[A-Za-z0-9_-]{43}$'
+
+AuthStaf:
+  type: object
+  additionalProperties: false
+  required: [token, staff]
+  properties:
+    token:
+      $ref: '#/TokenSesi'
+    staff:
+      $ref: '#/Staf'
+
+StatusSetup:
+  type: object
+  additionalProperties: false
+  required: [needsSetup]
+  properties:
+    needsSetup:
+      type: boolean
+      description: '`true` selama tabel `staff` kosong (staf nonaktif tetap dihitung).'
+
+Nama:
+  type: string
+  description: |
+    Dipangkas. Kosong → `required`; kurang dari 2 karakter → `too_short`;
+    lebih dari 100 karakter (code point Unicode) → `too_long`.
+  minLength: 2
+  maxLength: 100
+
+Email:
+  type: string
+  description: |
+    Dipangkas, lalu huruf A-Z diubah menjadi a-z (huruf lain tidak
+    disentuh). Kosong → `required`; lebih dari 254 karakter → `too_long`;
+    tidak cocok dengan pola (hanya ASCII) → `invalid_format`, termasuk email
+    yang memuat huruf non-ASCII seperti `josé@contoh.id`.
+  maxLength: 254
+  pattern: '^[a-z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$'
+
+Sandi:
+  type: string
+  description: |
+    Tidak dipangkas. String kosong → `required`; kurang dari 8 **byte**
+    UTF-8 → `too_short`; lebih dari 72 byte UTF-8 → `too_long` (bcrypt
+    mengabaikan byte setelah ke-72); memuat karakter NUL (U+0000) →
+    `invalid_format`. Panjang dinilai sebelum NUL. Contoh: `"é" × 36` = 72
+    byte diterima, `"é" × 37` = 74 byte → `too_long`, `"abc\u0000defg"` →
+    `invalid_format`. Disimpan sebagai hash bcrypt cost 12; hash buatan
+    backend mana pun wajib bisa diperiksa semua backend lainnya, jadi awalan
+    `$2a$`, `$2b$`, dan `$2y$` semuanya wajib diterima saat masuk.
+
+SetupRequest:
+  type: object
+  description: Field lain di badan diabaikan. Semua field wajib.
+  required: [token, name, email, password]
+  properties:
+    token:
+      type: string
+      description: |
+        Isi env `SETUP_TOKEN` backend. Tidak dipangkas. Tidak dikirim,
+        `null`, atau kosong → `required`; bukan string → `invalid_type`.
+        Isinya dibandingkan dengan fungsi waktu-konstan setelah semua field
+        lolos validasi; beda → 403 `setup_token_invalid`.
+    name:
+      $ref: '#/Nama'
+    email:
+      $ref: '#/Email'
+    password:
+      $ref: '#/Sandi'
+
+MasukStafRequest:
+  type: object
+  description: |
+    Field lain di badan diabaikan. `email` dan `password` wajib berupa string
+    yang tidak kosong (`email` dinilai setelah dipangkas; `password` tidak
+    dipangkas): tidak dikirim, `null`, atau kosong → `required`; bukan string
+    → `invalid_type`. Format email dan panjang sandi tidak divalidasi; sandi
+    yang memuat NUL atau lebih dari 72 byte tidak pernah cocok dan dibalas
+    401 `invalid_credentials` seperti sandi salah.
+  required: [email, password]
+  properties:
+    email:
+      type: string
+      description: Dipangkas, lalu A-Z diubah menjadi a-z sebelum dicari.
+    password:
+      type: string
+
+BuatStafRequest:
+  type: object
+  description: Field lain di badan diabaikan. Staf baru selalu aktif.
+  required: [name, email, password, role]
+  properties:
+    name:
+      $ref: '#/Nama'
+    email:
+      $ref: '#/Email'
+    password:
+      $ref: '#/Sandi'
+    role:
+      type: string
+      description: '`owner`, `cashier`, atau `mechanic`, dibandingkan persis. Tidak dikirim, `null`, atau kosong → `required`; bukan string → `invalid_type`; nilai lain (termasuk `Mechanic`) → `invalid_format`.'
+      enum: [owner, cashier, mechanic]
+
+UbahStafRequest:
+  type: object
+  description: |
+    Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
+    membalas 200 tanpa perubahan. Field yang dikirim diperiksa dengan aturan
+    yang sama seperti saat membuat staf; `null` pada `name`, `email`,
+    `password`, atau `role` → `required`, dan `null` pada `isActive` →
+    `invalid_type`. Field lain di badan diabaikan.
+  properties:
+    name:
+      $ref: '#/Nama'
+    email:
+      $ref: '#/Email'
+    password:
+      $ref: '#/Sandi'
+    role:
+      type: string
+      enum: [owner, cashier, mechanic]
+    isActive:
+      type: boolean
+      description: Hanya `true` atau `false`.

@@ -1,0 +1,414 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+parts:
+  get:
+    operationId: daftarSparepart
+    tags: [Sparepart dan Stok]
+    summary: Daftar sparepart beserta stoknya
+    description: |
+      Semua peran staf. Urutan pemeriksaan: 401 → 422 (query) → 200. Semua
+      filter bisa digabung. Urut `name` naik (collation
+      `utf8mb4_0900_ai_ci`), lalu `partId` naik.
+
+      **Bentuk tiap baris bergantung peran peminta**: pemilik menerima
+      `SparepartPemilik` (dengan `costPrice`), kasir dan mekanik menerima
+      `SparepartStaf` (kunci `costPrice` **tidak ada sama sekali**). Satu
+      respons tidak pernah mencampur keduanya. (Di skema di bawah, `data`
+      kosong hanya dicocokkan ke bentuk pemilik supaya `oneOf` tetap
+      tunggal; pemeriksa kontrak menilai tiap baris dengan skema milik peran
+      peminta.)
+
+      `search` mencocokkan **nama** atau **SKU** (aturan "Nama").
+      `lowStock=true` menyaring sparepart yang perlu dibeli (`stock` <=
+      `minStock`). Sparepart nonaktif ikut tampil kecuali disaring dengan
+      `isActive`.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/Search'
+      - $ref: '../components/parameters/umum.yaml#/IsActiveQuery'
+      - $ref: '../components/parameters/umum.yaml#/LowStockQuery'
+      - $ref: '../components/parameters/umum.yaml#/Page'
+      - $ref: '../components/parameters/umum.yaml#/Limit'
+    responses:
+      '200':
+        description: Satu halaman sparepart.
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - title: Untuk pemilik
+                  type: object
+                  additionalProperties: false
+                  required: [data, meta]
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/sparepart.yaml#/SparepartPemilik'
+                    meta:
+                      $ref: '../components/schemas/umum.yaml#/Meta'
+                - title: Untuk kasir dan mekanik
+                  type: object
+                  additionalProperties: false
+                  required: [data, meta]
+                  properties:
+                    data:
+                      type: array
+                      minItems: 1
+                      items:
+                        $ref: '../components/schemas/sparepart.yaml#/SparepartStaf'
+                    meta:
+                      $ref: '../components/schemas/umum.yaml#/Meta'
+            examples:
+              pemilik:
+                $ref: '../components/examples/contoh.yaml#/DaftarSparepartPemilik'
+              kasir:
+                $ref: '../components/examples/contoh.yaml#/DaftarSparepartStaf'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+  post:
+    operationId: buatSparepart
+    tags: [Sparepart dan Stok]
+    summary: Menambah sparepart
+    description: |
+      Khusus pemilik (kasir dan mekanik → 403). Urutan: 413 → 400 → 401 →
+      403 → 422 → 409 `sku_taken` → 201 dengan sparepart baru.
+
+      Sparepart baru aktif. Bila `initialStock` lebih dari 0, sparepart dan
+      satu baris kartu stok `IN` (catatan `Stok awal`, staf yang masuk)
+      dibuat dalam satu transaksi, sehingga `stock` langsung sama dengan
+      `initialStock`. SKU kembar, juga bila dibuat serentak → 409 (errno
+      1062 dipetakan ke 409).
+    security:
+      - tokenStaf: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/sparepart.yaml#/BuatSparepartRequest'
+          example:
+            sku: oli-10w40-08
+            name: Oli Mesin 10W-40 0,8 L
+            unit: botol
+            price: 55000
+            costPrice: 42000
+            minStock: 5
+            initialStock: 13
+    responses:
+      '201':
+        description: Sparepart dibuat.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/sparepart.yaml#/SparepartPemilik'
+            examples:
+              baru:
+                $ref: '../components/examples/contoh.yaml#/SparepartPemilik'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '409':
+        description: '`sku_taken`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: sku_taken
+                message: SKU sudah dipakai
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+part:
+  patch:
+    operationId: ubahSparepart
+    tags: [Sparepart dan Stok]
+    summary: Mengubah SKU, nama, satuan, harga, harga beli, stok minimum, atau status aktif
+    description: |
+      Khusus pemilik. Urutan: 413 → 400 → 401 → 403 → 404 → 422 → 409
+      `sku_taken` (SKU dipakai sparepart **lain**) → 200 dengan sparepart
+      sesudah diubah. Stok tidak bisa diubah di sini. Baris dikunci
+      (`SELECT … FOR UPDATE`) dan `UPDATE` hanya menyentuh field yang
+      dikirim, sehingga PATCH yang serentak dengan item SPK atau stok masuk
+      tidak menimpa stok. Menonaktifkan sparepart yang masih ada di SPK
+      terbuka boleh; item yang sudah ada tidak berubah.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/PartId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/sparepart.yaml#/UbahSparepartRequest'
+          example:
+            price: 57000
+            minStock: 6
+    responses:
+      '200':
+        description: Sparepart sesudah diubah.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/sparepart.yaml#/SparepartPemilik'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`sku_taken`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+movements:
+  get:
+    operationId: daftarPergerakanStok
+    tags: [Sparepart dan Stok]
+    summary: Kartu stok satu sparepart
+    description: |
+      Khusus pemilik. Urutan: 401 → 403 → 404 (sparepart tidak ada) → 422
+      (query) → 200. Urut `createdAt` terbaru dulu, lalu `movementId` turun.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/PartId'
+      - $ref: '../components/parameters/umum.yaml#/Page'
+      - $ref: '../components/parameters/umum.yaml#/Limit'
+    responses:
+      '200':
+        description: Satu halaman kartu stok.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/sparepart.yaml#/PergerakanStok'
+                meta:
+                  $ref: '../components/schemas/umum.yaml#/Meta'
+            examples:
+              kartu:
+                $ref: '../components/examples/contoh.yaml#/KartuStok'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+stockIn:
+  post:
+    operationId: stokMasuk
+    tags: [Sparepart dan Stok]
+    summary: Mencatat stok masuk (belanja)
+    description: |
+      Khusus pemilik. Urutan: 413 → 400 → 401 → 403 → 404 → 422 → 200 dengan
+      sparepart sesudah stoknya bertambah.
+
+      Dalam satu transaksi yang mengunci baris sparepart (`SELECT … FOR
+      UPDATE`): `stock` bertambah `quantity`, `costPrice` berubah bila
+      dikirim, dan satu baris kartu stok `IN` (staf yang masuk) ditambahkan.
+      Dua pencatatan serentak pada sparepart yang sama sama-sama terhitung.
+      Sparepart nonaktif boleh dicatat.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/PartId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/sparepart.yaml#/StokMasukRequest'
+          example:
+            quantity: 24
+            costPrice: 43000
+            note: Belanja di toko Sinar Motor
+    responses:
+      '200':
+        description: Sparepart sesudah stoknya bertambah.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/sparepart.yaml#/SparepartPemilik'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+stockOut:
+  post:
+    operationId: stokKeluar
+    tags: [Sparepart dan Stok]
+    summary: Mencatat stok keluar manual (rusak, hilang)
+    description: |
+      Khusus pemilik. Urutan: 413 → 400 → 401 → 403 → 404 → 422 → 409
+      `insufficient_stock` → 200 dengan sparepart sesudah stoknya berkurang.
+
+      `quantity` lebih besar dari stok sekarang → 409 `insufficient_stock`
+      dan tidak ada yang berubah; stok tidak pernah negatif. Pesan galatnya
+      memakai format baku di bagian "Sparepart dan stok" deskripsi API.
+      Kartu stok mendapat satu baris `OUT` (`quantity` negatif, catatan
+      wajib). Penguncian dan keserentakan seperti `stock-in`.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/PartId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/sparepart.yaml#/StokKeluarRequest'
+          example:
+            quantity: 1
+            note: Botol pecah
+    responses:
+      '200':
+        description: Sparepart sesudah stoknya berkurang.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/sparepart.yaml#/SparepartPemilik'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`insufficient_stock`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              stokKurang:
+                $ref: '../components/examples/contoh.yaml#/GalatStokKurang'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+stockCount:
+  post:
+    operationId: hitungStok
+    tags: [Sparepart dan Stok]
+    summary: Hitung ulang stok (opname)
+    description: |
+      Khusus pemilik. Urutan: 413 → 400 → 401 → 403 → 404 → 422 → 200 dengan
+      sparepart sesudah stoknya menjadi `countedStock`.
+
+      Dalam satu transaksi yang mengunci baris sparepart: `stock` menjadi
+      `countedStock` dan satu baris kartu stok `COUNT` ditambahkan, dengan
+      `quantity` = `countedStock` − stok sebelumnya (boleh 0; hitungan yang
+      sama dengan stok tetap dicatat sebagai bukti bahwa stok sudah dihitung).
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/PartId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/sparepart.yaml#/HitungStokRequest'
+          example:
+            countedStock: 12
+            note: Opname, satu botol bocor
+    responses:
+      '200':
+        description: Sparepart sesudah stoknya dihitung ulang.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/sparepart.yaml#/SparepartPemilik'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

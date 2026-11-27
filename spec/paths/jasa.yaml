@@ -1,0 +1,161 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+services:
+  get:
+    operationId: daftarJasa
+    tags: [Jasa]
+    summary: Semua jasa servis
+    description: |
+      Semua peran staf (pilihan jasa di SPK). Urutan pemeriksaan: 401 → 422
+      (query) → 200. Tanpa paginasi (`{data: [...]}` tanpa `meta`), karena
+      daftar jasa satu bengkel kecil. Jasa nonaktif dan yang tidak tampil di
+      website ikut, kecuali disaring `isActive`. `search` mencocokkan **nama
+      jasa** (aturan "Nama"). Urut `sortOrder` naik, lalu `name` naik
+      (collation `utf8mb4_0900_ai_ci`), lalu `serviceId` naik.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/Search'
+      - $ref: '../components/parameters/umum.yaml#/IsActiveQuery'
+    responses:
+      '200':
+        description: Daftar jasa.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/jasa.yaml#/Jasa'
+            examples:
+              daftar:
+                $ref: '../components/examples/contoh.yaml#/DaftarJasa'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+  post:
+    operationId: buatJasa
+    tags: [Jasa]
+    summary: Menambah jasa servis
+    description: |
+      Khusus pemilik (kasir dan mekanik → 403). Urutan: 413 → 400 → 401 →
+      403 → 422 → 409 `service_name_taken` → 201. Nama kembar menurut
+      collation, juga bila dibuat serentak → 409 (errno 1062 dipetakan ke
+      409, bukan 500).
+    security:
+      - tokenStaf: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/jasa.yaml#/BuatJasaRequest'
+          example:
+            name: Ganti Oli
+            description: Ganti oli mesin dan cek kebocoran.
+            price: 35000
+            durationMinutes: 30
+            sortOrder: 1
+    responses:
+      '201':
+        description: Jasa dibuat.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/jasa.yaml#/Jasa'
+            examples:
+              baru:
+                $ref: '../components/examples/contoh.yaml#/Jasa'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '409':
+        description: '`service_name_taken`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: service_name_taken
+                message: Nama jasa sudah dipakai
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+service:
+  patch:
+    operationId: ubahJasa
+    tags: [Jasa]
+    summary: Mengubah jasa, termasuk tampil di website dan status aktif
+    description: |
+      Khusus pemilik. Urutan: 413 → 400 → 401 → 403 → 404 → 422 → 409
+      `service_name_taken` (nama dipakai jasa **lain**; nama sendiri, juga
+      bila hanya beda huruf besar/kecil, bukan bentrok) → 200. Jasa tidak
+      pernah dihapus. Baris dikunci (`SELECT … FOR UPDATE`) dan hanya field
+      yang dikirim yang diubah. Booking yang menunggu dengan jasa yang
+      sesudahnya dinonaktifkan tetap sah; saat dijadikan SPK, jasa itu tidak
+      menjadi item (lihat `jadikanSpk`).
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/ServiceId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/jasa.yaml#/UbahJasaRequest'
+          example:
+            price: 40000
+    responses:
+      '200':
+        description: Jasa sesudah diubah.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/jasa.yaml#/Jasa'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`service_name_taken`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

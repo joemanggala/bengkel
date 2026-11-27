@@ -1,0 +1,694 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+StatusSpk:
+  type: string
+  description: |
+    `QUEUED` → `IN_PROGRESS` ⇄ `WAITING_PARTS`; `IN_PROGRESS` → `DONE` →
+    `PICKED_UP`. `CANCELLED` dari `QUEUED`, `IN_PROGRESS`, atau
+    `WAITING_PARTS`. SPK baru (termasuk hasil konversi booking) selalu
+    mulai `QUEUED`. Tabel lengkapnya di bagian "Status SPK" deskripsi API.
+  enum: [QUEUED, IN_PROGRESS, WAITING_PARTS, DONE, PICKED_UP, CANCELLED]
+  x-label:
+    QUEUED: Antre
+    IN_PROGRESS: Dikerjakan
+    WAITING_PARTS: Menunggu part
+    DONE: Selesai
+    PICKED_UP: Diambil
+    CANCELLED: Dibatalkan
+
+StatusBayar:
+  type: string
+  description: |
+    Turunan dari `paidAmount` dan `total`, tidak disimpan (sama dengan
+    kafe-resto): `paid` bila `paidAmount` = `total` (termasuk SPK bertotal
+    0), selain itu `partial` bila `paidAmount` > 0, selain itu `unpaid`.
+  enum: [unpaid, partial, paid]
+  x-label:
+    unpaid: Belum bayar
+    partial: Bayar sebagian
+    paid: Lunas
+
+MetodeBayar:
+  type: string
+  enum: [cash, transfer, qris]
+  x-label:
+    cash: Tunai
+    transfer: Transfer
+    qris: QRIS
+
+NomorSpk:
+  type: string
+  description: '`S-` + angka berurutan minimal 4 digit: `S-0001`, `S-9999`, `S-10000`.'
+  pattern: '^S-[0-9]{4,}$'
+
+JenisItem:
+  type: string
+  enum: [SERVICE, PART]
+  x-label:
+    SERVICE: Jasa
+    PART: Sparepart
+
+ItemSpk:
+  type: object
+  description: |
+    Salinan jasa atau sparepart saat ditambahkan ke SPK. Harga beli part
+    juga disalin ke item (untuk laba di rekap), tetapi **tidak pernah**
+    dikirim di respons SPK untuk siapa pun, termasuk pemilik.
+  additionalProperties: false
+  required: [itemId, type, serviceId, partId, name, price, quantity, subtotal, createdAt]
+  properties:
+    itemId:
+      $ref: './umum.yaml#/Uuid'
+    type:
+      $ref: '#/JenisItem'
+    serviceId:
+      description: Terisi hanya untuk `SERVICE`.
+      oneOf:
+        - $ref: './umum.yaml#/Uuid'
+        - type: 'null'
+    partId:
+      description: Terisi hanya untuk `PART`.
+      oneOf:
+        - $ref: './umum.yaml#/Uuid'
+        - type: 'null'
+    name:
+      type: string
+      description: Salinan nama jasa atau sparepart saat ditambahkan.
+    price:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+    quantity:
+      type: integer
+      minimum: 1
+      maximum: 99
+    subtotal:
+      type: integer
+      minimum: 0
+      description: '`price` × `quantity`.'
+    createdAt:
+      type: string
+      format: date-time
+
+ItemSpkPublik:
+  type: object
+  additionalProperties: false
+  required: [type, name, price, quantity, subtotal]
+  properties:
+    type:
+      $ref: '#/JenisItem'
+    name:
+      type: string
+    price:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+    quantity:
+      type: integer
+      minimum: 1
+      maximum: 99
+    subtotal:
+      type: integer
+      minimum: 0
+
+Pembayaran:
+  type: object
+  additionalProperties: false
+  required: [paymentId, amount, method, recordedBy, createdAt]
+  properties:
+    paymentId:
+      $ref: './umum.yaml#/Uuid'
+    amount:
+      type: integer
+      minimum: 1
+    method:
+      $ref: '#/MetodeBayar'
+    recordedBy:
+      $ref: './staf.yaml#/StafRingkas'
+    createdAt:
+      type: string
+      format: date-time
+
+LogStatus:
+  type: object
+  description: |
+    Satu perpindahan status. Baris pertama (`fromStatus` `null` →
+    `QUEUED`) ditulis saat SPK dibuat. Semua perpindahan SPK dilakukan staf.
+  additionalProperties: false
+  required: [fromStatus, toStatus, by, note, createdAt]
+  properties:
+    fromStatus:
+      oneOf:
+        - $ref: '#/StatusSpk'
+        - type: 'null'
+    toStatus:
+      $ref: '#/StatusSpk'
+    by:
+      $ref: './staf.yaml#/StafRingkas'
+    note:
+      type: string
+      description: Catatan staf saat mengubah status (boleh kosong). Untuk `CANCELLED` berisi alasan batal. Tidak tampil di halaman publik.
+    createdAt:
+      type: string
+      format: date-time
+
+LogStatusPublik:
+  type: object
+  description: Perpindahan status tanpa catatan dan nama staf.
+  additionalProperties: false
+  required: [fromStatus, toStatus, createdAt]
+  properties:
+    fromStatus:
+      oneOf:
+        - $ref: '#/StatusSpk'
+        - type: 'null'
+    toStatus:
+      $ref: '#/StatusSpk'
+    createdAt:
+      type: string
+      format: date-time
+
+StatusWa:
+  type: object
+  description: Hasil percobaan kirim terakhir untuk satu jenis pesan.
+  additionalProperties: false
+  required: [status, createdAt]
+  properties:
+    status:
+      type: string
+      enum: [sent, failed]
+    createdAt:
+      type: string
+      format: date-time
+      description: Waktu percobaan kirim itu dicatat.
+
+RingkasanWa:
+  type: object
+  description: |
+    Status pesan WhatsApp terakhir per jenis untuk SPK ini (baris
+    `wa_messages` terbaru menurut `created_at`, lalu `wa_message_id` turun
+    bila waktunya sama), atau `null` bila jenis itu belum pernah dicoba
+    dikirim. Web memakainya untuk menampilkan "terkirim" atau "gagal, kirim
+    ulang".
+  additionalProperties: false
+  required: [workOrderCreated, workOrderDone, receipt]
+  properties:
+    workOrderCreated:
+      oneOf:
+        - $ref: '#/StatusWa'
+        - type: 'null'
+    workOrderDone:
+      oneOf:
+        - $ref: '#/StatusWa'
+        - type: 'null'
+    receipt:
+      oneOf:
+        - $ref: '#/StatusWa'
+        - type: 'null'
+
+BookingRingkas:
+  type: object
+  additionalProperties: false
+  required: [bookingId, number]
+  properties:
+    bookingId:
+      $ref: './umum.yaml#/Uuid'
+    number:
+      $ref: './booking.yaml#/NomorBooking'
+
+SpkRingkas:
+  type: object
+  description: Satu baris di daftar SPK (papan servis) dan riwayat servis kendaraan.
+  additionalProperties: false
+  required: [number, status, paymentStatus, customer, vehicle, mechanic, complaint, itemCount, total, paidAmount, estimatedDoneAt, createdAt, updatedAt]
+  properties:
+    number:
+      $ref: '#/NomorSpk'
+    status:
+      $ref: '#/StatusSpk'
+    paymentStatus:
+      $ref: '#/StatusBayar'
+    customer:
+      $ref: './pelanggan.yaml#/PelangganRingkas'
+    vehicle:
+      $ref: './pelanggan.yaml#/KendaraanRingkas'
+    mechanic:
+      description: Mekanik yang ditugaskan, atau `null`. Mekanik yang sudah nonaktif tetap ditampilkan.
+      oneOf:
+        - $ref: './staf.yaml#/StafRingkas'
+        - type: 'null'
+    complaint:
+      type: string
+    itemCount:
+      type: integer
+      minimum: 0
+      maximum: 50
+      description: Jumlah baris item (bukan jumlah `quantity`).
+    total:
+      type: integer
+      minimum: 0
+    paidAmount:
+      type: integer
+      minimum: 0
+    estimatedDoneAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+      description: Berubah setiap kali SPK, itemnya, statusnya, atau pembayarannya berubah. Web memakainya untuk tahu ada perubahan saat memuat ulang berkala.
+
+SpkDetail:
+  type: object
+  description: |
+    SPK lengkap untuk staf. `items` urut waktu ditambahkan (nomor baris naik);
+    `payments` urut `createdAt` naik, lalu `paymentId` naik; `timeline` urut
+    `createdAt` naik (lalu urutan penulisan bila waktunya sama).
+
+    `trackingToken` adalah token halaman lacak `/servis/{trackingToken}`.
+    Token ini disimpan apa adanya (bukan hash) supaya pesan WhatsApp "siap
+    diambil" dan nota yang dikirim kemudian tetap bisa memuat tautannya, dan
+    kasir bisa menyalinnya kapan saja (keputusan Bagian 0a, sama dengan
+    `qr_token` meja di kafe-resto). Membuat ulang
+    (`POST /api/work-orders/{number}/tracking-link`) mematikan token lama.
+  additionalProperties: false
+  required:
+    - number
+    - status
+    - paymentStatus
+    - customer
+    - vehicle
+    - booking
+    - mechanic
+    - complaint
+    - diagnosis
+    - odometer
+    - estimatedDoneAt
+    - serviceSubtotal
+    - partSubtotal
+    - total
+    - paidAmount
+    - remainingAmount
+    - cancelReason
+    - trackingToken
+    - createdBy
+    - createdAt
+    - updatedAt
+    - items
+    - payments
+    - timeline
+    - wa
+  properties:
+    number:
+      $ref: '#/NomorSpk'
+    status:
+      $ref: '#/StatusSpk'
+    paymentStatus:
+      $ref: '#/StatusBayar'
+    customer:
+      $ref: './pelanggan.yaml#/PelangganRingkas'
+    vehicle:
+      $ref: './pelanggan.yaml#/KendaraanSpk'
+    booking:
+      description: Booking asal bila SPK dibuat dari booking, selain itu `null`.
+      oneOf:
+        - $ref: '#/BookingRingkas'
+        - type: 'null'
+    mechanic:
+      oneOf:
+        - $ref: './staf.yaml#/StafRingkas'
+        - type: 'null'
+    complaint:
+      type: string
+    diagnosis:
+      type: string
+      description: Diagnosis mekanik, boleh kosong. Tidak tampil di halaman publik.
+    odometer:
+      description: Kilometer saat kendaraan masuk, atau `null`.
+      oneOf:
+        - type: integer
+          minimum: 0
+          maximum: 9999999
+        - type: 'null'
+    estimatedDoneAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    serviceSubtotal:
+      type: integer
+      minimum: 0
+      description: Jumlah `subtotal` item `SERVICE`.
+    partSubtotal:
+      type: integer
+      minimum: 0
+      description: Jumlah `subtotal` item `PART`.
+    total:
+      type: integer
+      minimum: 0
+      description: '`serviceSubtotal` + `partSubtotal`. Tanpa pajak dan diskon.'
+    paidAmount:
+      type: integer
+      minimum: 0
+    remainingAmount:
+      type: integer
+      minimum: 0
+      description: '`total` − `paidAmount`.'
+    cancelReason:
+      description: Alasan batal; `null` selama SPK tidak `CANCELLED`.
+      oneOf:
+        - type: string
+        - type: 'null'
+    trackingToken:
+      $ref: './umum.yaml#/TokenPublik'
+    createdBy:
+      $ref: './staf.yaml#/StafRingkas'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: '#/ItemSpk'
+    payments:
+      type: array
+      items:
+        $ref: '#/Pembayaran'
+    timeline:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/LogStatus'
+    wa:
+      $ref: '#/RingkasanWa'
+
+SpkPublik:
+  type: object
+  description: |
+    SPK seperti dilihat pelanggan di halaman lacak, yang juga menjadi nota
+    online: profil outlet, status, linimasa tanpa catatan dan nama staf,
+    kendaraan, item tanpa harga beli, total, terbayar, dan sisa. Tidak memuat
+    nama mekanik, diagnosis, data staf, pembayaran per baris, status
+    WhatsApp, maupun token. Nomor HP disamarkan.
+  additionalProperties: false
+  required:
+    - outlet
+    - number
+    - status
+    - paymentStatus
+    - customerName
+    - customerPhone
+    - vehicle
+    - complaint
+    - estimatedDoneAt
+    - serviceSubtotal
+    - partSubtotal
+    - total
+    - paidAmount
+    - remainingAmount
+    - cancelReason
+    - createdAt
+    - items
+    - timeline
+  properties:
+    outlet:
+      $ref: './outlet.yaml#/Outlet'
+    number:
+      $ref: '#/NomorSpk'
+    status:
+      $ref: '#/StatusSpk'
+    paymentStatus:
+      $ref: '#/StatusBayar'
+    customerName:
+      type: string
+    customerPhone:
+      $ref: './umum.yaml#/NomorHpSamaran'
+    vehicle:
+      $ref: './pelanggan.yaml#/KendaraanPublik'
+    complaint:
+      type: string
+    estimatedDoneAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    serviceSubtotal:
+      type: integer
+      minimum: 0
+    partSubtotal:
+      type: integer
+      minimum: 0
+    total:
+      type: integer
+      minimum: 0
+    paidAmount:
+      type: integer
+      minimum: 0
+    remainingAmount:
+      type: integer
+      minimum: 0
+    cancelReason:
+      description: Alasan batal (terlihat pelanggan), atau `null`.
+      oneOf:
+        - type: string
+        - type: 'null'
+    createdAt:
+      type: string
+      format: date-time
+    items:
+      type: array
+      maxItems: 50
+      items:
+        $ref: '#/ItemSpkPublik'
+    timeline:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/LogStatusPublik'
+
+MekanikMasukan:
+  description: |
+    UUID mekanik yang ditugaskan, atau `null` (= belum ditugaskan; di
+    `PATCH` berarti melepas mekanik). String kosong → `required`; bukan
+    string → `invalid_type`; bukan UUID kanonik huruf kecil →
+    `invalid_format`; tidak ada staf dengan ID itu, **atau stafnya bukan
+    ber-`role` `mechanic`** → `unknown_reference`; mekanik nonaktif →
+    `inactive_reference`. Di `PATCH`, mengirim ID yang sama dengan mekanik
+    yang sekarang tidak diperiksa lagi (mekanik yang sudah nonaktif tetap
+    tertera di SPK lamanya).
+  oneOf:
+    - $ref: './umum.yaml#/UuidMasukan'
+    - type: 'null'
+
+OdometerMasukan:
+  description: |
+    Kilometer saat kendaraan masuk, integer 0 sampai 9.999.999, atau `null`
+    (= tidak diisi). Bukan integer → `invalid_type`; di luar rentang →
+    `out_of_range`.
+  oneOf:
+    - type: integer
+      minimum: 0
+      maximum: 9999999
+    - type: 'null'
+
+EstimasiMasukan:
+  description: Perkiraan selesai (`WaktuMasukan`), atau `null` (= tidak diisi). Boleh di masa lalu; tidak dibandingkan dengan jam server.
+  oneOf:
+    - $ref: './umum.yaml#/WaktuMasukan'
+    - type: 'null'
+
+Keluhan:
+  type: string
+  description: Dipangkas. Kosong → `required`; lebih dari 1000 karakter → `too_long`. Boleh berisi pergantian baris.
+  minLength: 1
+  maxLength: 1000
+
+BuatSpkRequest:
+  type: object
+  description: |
+    SPK untuk pelanggan yang datang langsung. Pelanggan diambil dari pemilik
+    kendaraan. Field lain di badan diabaikan. Semua field diperiksa
+    sekaligus, termasuk rujukan.
+  required: [vehicleId, complaint]
+  properties:
+    vehicleId:
+      allOf:
+        - $ref: './umum.yaml#/UuidMasukan'
+      description: |
+        UUID kendaraan. Tidak dikirim, `null`, atau kosong → `required`;
+        bukan string → `invalid_type`; bukan UUID kanonik →
+        `invalid_format`; tidak ada → `unknown_reference`.
+    complaint:
+      $ref: '#/Keluhan'
+    odometer:
+      $ref: '#/OdometerMasukan'
+    estimatedDoneAt:
+      $ref: '#/EstimasiMasukan'
+    mechanicId:
+      $ref: '#/MekanikMasukan'
+
+UbahSpkRequest:
+  type: object
+  description: |
+    Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
+    membalas 200 tanpa perubahan (juga untuk mekanik). `null` pada
+    `complaint` → `required`; `null` pada `diagnosis` → `invalid_type`;
+    `null` pada `mechanicId`, `odometer`, atau `estimatedDoneAt` =
+    mengosongkannya. Field lain di badan diabaikan.
+
+    Pemilik dan kasir boleh mengubah kelima field. **Mekanik hanya boleh
+    `diagnosis`**: badan dari mekanik yang memuat kunci `mechanicId`,
+    `complaint`, `odometer`, atau `estimatedDoneAt` (apa pun nilainya,
+    termasuk `null`) → 403 `forbidden`.
+  properties:
+    mechanicId:
+      $ref: '#/MekanikMasukan'
+    complaint:
+      $ref: '#/Keluhan'
+    diagnosis:
+      type: string
+      maxLength: 2000
+      description: Dipangkas; boleh kosong. Lebih dari 2000 karakter → `too_long`. Boleh berisi pergantian baris.
+    odometer:
+      $ref: '#/OdometerMasukan'
+    estimatedDoneAt:
+      $ref: '#/EstimasiMasukan'
+
+UbahStatusSpkRequest:
+  type: object
+  description: Field lain di badan diabaikan.
+  required: [status]
+  properties:
+    status:
+      type: string
+      description: |
+        Status tujuan: `IN_PROGRESS`, `WAITING_PARTS`, `DONE`, atau
+        `PICKED_UP`, dibandingkan persis. Tidak dikirim, `null`, atau kosong
+        → `required`; bukan string → `invalid_type`; nilai lain (termasuk
+        `QUEUED`, `CANCELLED`, dan huruf kecil) → `invalid_format`.
+        Pembatalan memakai `POST /api/work-orders/{number}/cancel`.
+      enum: [IN_PROGRESS, WAITING_PARTS, DONE, PICKED_UP]
+    note:
+      type: string
+      maxLength: 200
+      description: Catatan untuk linimasa, opsional (bawaan string kosong; `null` → `invalid_type`). Dipangkas; lebih dari 200 karakter → `too_long`. Tidak tampil di halaman publik.
+
+BatalSpkRequest:
+  type: object
+  description: Field lain di badan diabaikan.
+  required: [reason]
+  properties:
+    reason:
+      type: string
+      minLength: 3
+      maxLength: 500
+      description: |
+        Alasan batal. Dipangkas. Tidak dikirim, `null`, atau kosong →
+        `required`; kurang dari 3 karakter → `too_short`; lebih dari 500 →
+        `too_long`. Alasan ini **terlihat oleh pelanggan** di halaman lacak
+        (`SpkPublik.cancelReason`).
+
+TambahItemRequest:
+  type: object
+  description: |
+    Satu item per permintaan. Field lain di badan diabaikan. Bila `type`
+    tidak dikirim atau tidak sah, field lain tidak diperiksa dan hanya galat
+    `type` yang dilaporkan.
+  required: [type, quantity]
+  properties:
+    type:
+      type: string
+      description: '`SERVICE` atau `PART`, dibandingkan persis. Tidak dikirim, `null`, atau kosong → `required`; bukan string → `invalid_type`; nilai lain → `invalid_format`.'
+      enum: [SERVICE, PART]
+    serviceId:
+      allOf:
+        - $ref: './umum.yaml#/UuidMasukan'
+      description: |
+        **Wajib bila `type` = `SERVICE`**, diabaikan untuk `PART`. Tidak
+        dikirim, `null`, atau kosong → `required`; bukan string →
+        `invalid_type`; bukan UUID kanonik → `invalid_format`; tidak ada →
+        `unknown_reference`; jasa nonaktif → `inactive_reference` (jasa yang
+        tidak tampil di website boleh dipakai).
+    partId:
+      allOf:
+        - $ref: './umum.yaml#/UuidMasukan'
+      description: |
+        **Wajib bila `type` = `PART`**, diabaikan untuk `SERVICE`. Aturan
+        sama dengan `serviceId`; sparepart nonaktif → `inactive_reference`.
+    quantity:
+      type: integer
+      minimum: 1
+      maximum: 99
+      description: Tidak dikirim atau `null` → `required`; bukan integer → `invalid_type`; di luar 1..99 → `out_of_range`.
+    price:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+      description: |
+        Hanya untuk `SERVICE`: harga per satuan untuk item ini, 0 sampai
+        100.000.000 (mis. pekerjaan tambahan yang harganya beda). Tidak
+        dikirim = harga katalog jasa saat ini; `null` → `invalid_type`;
+        bukan integer → `invalid_type`; di luar rentang → `out_of_range`.
+        Untuk `PART` field ini **diabaikan seluruhnya** (tidak diperiksa):
+        harga part selalu harga jual katalog saat ditambahkan.
+
+BayarRequest:
+  type: object
+  description: Field lain di badan diabaikan.
+  required: [amount, method]
+  properties:
+    amount:
+      type: integer
+      minimum: 1
+      description: |
+        Rupiah. Tidak dikirim atau `null` → `required`; bukan integer →
+        `invalid_type`; kurang dari 1 atau nilai mutlaknya lebih dari 2^53−1
+        → `out_of_range`. Batas atasnya sisa tagihan (`total` −
+        `paidAmount`), dinilai setelah pemeriksaan 409 (lihat deskripsi
+        operasi).
+    method:
+      type: string
+      description: '`cash`, `transfer`, atau `qris`, dibandingkan persis. Tidak dikirim, `null`, atau kosong → `required`; bukan string → `invalid_type`; nilai lain → `invalid_format`.'
+      enum: [cash, transfer, qris]
+
+JenisPesanWaSpk:
+  type: string
+  description: Jenis pesan WhatsApp yang bisa dikirim ulang kasir untuk satu SPK.
+  enum: [work_order_created, work_order_done, receipt]
+  x-label:
+    work_order_created: SPK dibuat (tautan lacak)
+    work_order_done: Siap diambil
+    receipt: Nota
+
+KirimWaRequest:
+  type: object
+  description: Field lain di badan diabaikan.
+  required: [type]
+  properties:
+    type:
+      type: string
+      description: |
+        `work_order_created`, `work_order_done`, atau `receipt`. Tidak
+        dikirim, `null`, atau kosong → `required`; bukan string →
+        `invalid_type`; nilai lain (termasuk `booking_confirmed`) →
+        `invalid_format`.
+      enum: [work_order_created, work_order_done, receipt]
+    phone:
+      description: |
+        Opsional. Nomor tujuan yang dipakai **hanya untuk pengiriman ini**
+        (tidak mengubah nomor pelanggan), mis. nota diminta dikirim ke nomor
+        lain. Tidak dikirim atau `null` = nomor pelanggan SPK. Selain `null`,
+        diperiksa dengan aturan `NomorHpMasukan`.
+      oneOf:
+        - $ref: './umum.yaml#/NomorHpMasukan'
+        - type: 'null'

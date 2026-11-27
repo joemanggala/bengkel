@@ -1,0 +1,320 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+StatusBooking:
+  type: string
+  description: |
+    `PENDING` → `CONFIRMED` → `CONVERTED`; `PENDING` boleh langsung ke
+    `CONVERTED`. `REJECTED` dari `PENDING` atau `CONFIRMED` (staf, wajib
+    alasan). `CANCELLED` hanya dari `PENDING` (pelanggan). `CONVERTED`,
+    `REJECTED`, dan `CANCELLED` adalah akhir; tidak ada perpindahan lagi.
+  enum: [PENDING, CONFIRMED, CONVERTED, REJECTED, CANCELLED]
+  x-label:
+    PENDING: Menunggu
+    CONFIRMED: Dikonfirmasi
+    CONVERTED: Jadi SPK
+    REJECTED: Ditolak
+    CANCELLED: Dibatalkan
+
+NomorBooking:
+  type: string
+  description: '`B-` + angka berurutan minimal 4 digit: `B-0001`, `B-9999`, `B-10000`.'
+  pattern: '^B-[0-9]{4,}$'
+
+JasaRingkas:
+  type: object
+  description: Jasa yang dipilih saat booking; `name` adalah salinan nama saat booking dibuat.
+  additionalProperties: false
+  required: [serviceId, name]
+  properties:
+    serviceId:
+      $ref: './umum.yaml#/Uuid'
+    name:
+      type: string
+
+RingkasanWaBooking:
+  type: object
+  description: |
+    Status pesan WhatsApp terakhir per jenis untuk booking ini (baris
+    `wa_messages` terbaru menurut `created_at`, lalu `wa_message_id` turun),
+    atau `null` bila jenis itu belum pernah dicoba dikirim. Tidak ada rute
+    kirim ulang untuk pesan booking; bila gagal, staf menghubungi pelanggan
+    sendiri.
+  additionalProperties: false
+  required: [bookingConfirmed, bookingRejected]
+  properties:
+    bookingConfirmed:
+      oneOf:
+        - $ref: './spk.yaml#/StatusWa'
+        - type: 'null'
+    bookingRejected:
+      oneOf:
+        - $ref: './spk.yaml#/StatusWa'
+        - type: 'null'
+
+Booking:
+  type: object
+  description: |
+    Booking seperti dilihat pemilik dan kasir. Data pemesan dan kendaraan
+    adalah salinan isian form publik; pelanggan dan kendaraan di database
+    baru dicari atau dibuat saat booking dijadikan SPK.
+  additionalProperties: false
+  required:
+    - bookingId
+    - number
+    - status
+    - customerName
+    - phone
+    - vehicleType
+    - plate
+    - plateKey
+    - vehicleBrand
+    - vehicleModel
+    - service
+    - visitDate
+    - complaint
+    - rejectReason
+    - workOrderNumber
+    - handledBy
+    - wa
+    - createdAt
+    - updatedAt
+  properties:
+    bookingId:
+      $ref: './umum.yaml#/Uuid'
+    number:
+      $ref: '#/NomorBooking'
+    status:
+      $ref: '#/StatusBooking'
+    customerName:
+      type: string
+    phone:
+      $ref: './umum.yaml#/NomorHp'
+    vehicleType:
+      $ref: './pelanggan.yaml#/JenisKendaraan'
+    plate:
+      $ref: './umum.yaml#/PlatTampilan'
+    plateKey:
+      $ref: './umum.yaml#/PlatKunci'
+    vehicleBrand:
+      type: string
+    vehicleModel:
+      type: string
+    service:
+      description: Jasa yang dipilih, atau `null` bila pelanggan tidak memilih.
+      oneOf:
+        - $ref: '#/JasaRingkas'
+        - type: 'null'
+    visitDate:
+      $ref: './umum.yaml#/Tanggal'
+    complaint:
+      type: string
+    rejectReason:
+      description: Alasan tolak; `null` selama status bukan `REJECTED`.
+      oneOf:
+        - type: string
+        - type: 'null'
+    workOrderNumber:
+      description: Nomor SPK hasil konversi; `null` selama status bukan `CONVERTED`.
+      oneOf:
+        - $ref: './spk.yaml#/NomorSpk'
+        - type: 'null'
+    handledBy:
+      description: Staf yang mengonfirmasi, menolak, atau menjadikan SPK (yang terakhir); `null` selama `PENDING` dan untuk booking yang dibatalkan pelanggan.
+      oneOf:
+        - $ref: './staf.yaml#/StafRingkas'
+        - type: 'null'
+    wa:
+      $ref: '#/RingkasanWaBooking'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+BookingPublik:
+  type: object
+  description: |
+    Booking seperti dilihat pelanggan yang memegang `bookingToken`: tanpa
+    ID, tanpa data staf, tanpa status WhatsApp, dan nomor HP disamarkan.
+    Satu-satunya teks dari staf yang tampil adalah `rejectReason`.
+  additionalProperties: false
+  required:
+    - number
+    - status
+    - customerName
+    - phone
+    - vehicleType
+    - plate
+    - vehicleBrand
+    - vehicleModel
+    - serviceName
+    - visitDate
+    - complaint
+    - rejectReason
+    - workOrderNumber
+    - createdAt
+  properties:
+    number:
+      $ref: '#/NomorBooking'
+    status:
+      $ref: '#/StatusBooking'
+    customerName:
+      type: string
+    phone:
+      $ref: './umum.yaml#/NomorHpSamaran'
+    vehicleType:
+      $ref: './pelanggan.yaml#/JenisKendaraan'
+    plate:
+      $ref: './umum.yaml#/PlatTampilan'
+    vehicleBrand:
+      type: string
+    vehicleModel:
+      type: string
+    serviceName:
+      oneOf:
+        - type: string
+        - type: 'null'
+    visitDate:
+      $ref: './umum.yaml#/Tanggal'
+    complaint:
+      type: string
+    rejectReason:
+      oneOf:
+        - type: string
+        - type: 'null'
+    workOrderNumber:
+      description: Nomor SPK bila booking sudah dijadikan SPK. Halaman lacak SPK tetap butuh `trackingToken` dari pesan WhatsApp.
+      oneOf:
+        - $ref: './spk.yaml#/NomorSpk'
+        - type: 'null'
+    createdAt:
+      type: string
+      format: date-time
+
+BookingDibuat:
+  type: object
+  description: |
+    Balasan pembuatan booking. `bookingToken` hanya dikirim di sini,
+    **sekali**: database hanya menyimpan hash-nya, jadi tidak ada cara
+    mengambilnya lagi. Web menyimpannya di alamat halaman
+    `/booking/{bookingToken}` dan penyimpanan lokal browser.
+  additionalProperties: false
+  required: [bookingToken, booking]
+  properties:
+    bookingToken:
+      $ref: './umum.yaml#/TokenPublik'
+    booking:
+      $ref: '#/BookingPublik'
+
+BuatBookingRequest:
+  type: object
+  description: |
+    Form booking publik. Field lain di badan diabaikan. Semua field
+    diperiksa sekaligus, termasuk rujukan `serviceId` (hanya bila formatnya
+    sah). Teks dari form publik tidak boleh memuat karakter kontrol (lihat
+    "Teks" di deskripsi API).
+  required: [customerName, phone, vehicleType, plate, vehicleBrand, visitDate, complaint]
+  properties:
+    customerName:
+      type: string
+      minLength: 2
+      maxLength: 100
+      description: |
+        Dipangkas. Kosong → `required`; kurang dari 2 karakter →
+        `too_short`; lebih dari 100 → `too_long`; karakter kontrol apa pun
+        (termasuk tab dan baris baru), U+2028/U+2029, dan pengatur arah teks
+        → `invalid_format`.
+    phone:
+      $ref: './umum.yaml#/NomorHpMasukan'
+    vehicleType:
+      type: string
+      description: '`MOTOR` atau `CAR`, dibandingkan persis. Tidak dikirim, `null`, atau kosong → `required`; bukan string → `invalid_type`; nilai lain → `invalid_format`.'
+      enum: [MOTOR, CAR]
+    plate:
+      $ref: './umum.yaml#/PlatMasukan'
+    vehicleBrand:
+      type: string
+      minLength: 1
+      maxLength: 50
+      description: Dipangkas. Kosong → `required`; lebih dari 50 → `too_long`; karakter kontrol → `invalid_format` (seperti `customerName`).
+    vehicleModel:
+      type: string
+      maxLength: 50
+      description: Opsional, bawaan string kosong; `null` → `invalid_type`. Dipangkas; lebih dari 50 → `too_long`; karakter kontrol → `invalid_format`.
+    serviceId:
+      description: |
+        Opsional. Tidak dikirim atau `null` = tanpa jasa. String kosong →
+        `required`; bukan string → `invalid_type`; bukan UUID kanonik huruf
+        kecil → `invalid_format`; tidak ada, **atau ada tetapi `isPublic`
+        `false`** → `unknown_reference` (jasa yang tidak tampil di website
+        diperlakukan seperti tidak ada); publik tetapi nonaktif →
+        `inactive_reference`.
+      oneOf:
+        - $ref: './umum.yaml#/UuidMasukan'
+        - type: 'null'
+    visitDate:
+      type: string
+      description: |
+        Tanggal datang `YYYY-MM-DD`. Tidak dikirim, `null`, atau kosong →
+        `required`; bukan string → `invalid_type`; tidak cocok pola atau
+        tidak ada di kalender (mis. `2026-02-30`) → `invalid_format`;
+        sebelum hari ini atau lebih dari 30 hari sesudah hari ini menurut
+        tanggal WIB saat permintaan diterima → `out_of_range`. Contoh: pada
+        27-11-2026 pukul 23.30 WIB yang sah `2026-11-27` sampai
+        `2026-12-27`; pada 27-11-2026 pukul 17.30 UTC (= 28-11-2026 00.30
+        WIB) yang sah `2026-11-28` sampai `2026-12-28`.
+      pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    complaint:
+      type: string
+      minLength: 1
+      maxLength: 1000
+      description: |
+        Keluhan. Dipangkas. Kosong → `required`; lebih dari 1000 karakter →
+        `too_long`. Boleh memuat tab, LF, dan CR; karakter kontrol lain,
+        U+2028/U+2029, dan pengatur arah teks → `invalid_format`.
+
+TolakBookingRequest:
+  type: object
+  description: Field lain di badan diabaikan.
+  required: [reason]
+  properties:
+    reason:
+      type: string
+      minLength: 3
+      maxLength: 500
+      description: |
+        Alasan tolak. Dipangkas. Tidak dikirim, `null`, atau kosong →
+        `required`; kurang dari 3 karakter → `too_short`; lebih dari 500 →
+        `too_long`. Alasan ini **terlihat oleh pelanggan** (halaman booking
+        dan pesan WhatsApp), jadi tulis untuk dibaca pelanggan, mis. "Bengkel
+        tutup tanggal itu, silakan pilih tanggal lain".
+
+JadikanSpkRequest:
+  type: object
+  description: |
+    Badan wajib berupa objek JSON (boleh `{}`). Semua field opsional dan
+    aturannya sama dengan field yang sama di `BuatSpkRequest`. Keluhan SPK
+    disalin dari booking. Field lain di badan diabaikan.
+  properties:
+    mechanicId:
+      $ref: './spk.yaml#/MekanikMasukan'
+    odometer:
+      $ref: './spk.yaml#/OdometerMasukan'
+    estimatedDoneAt:
+      $ref: './spk.yaml#/EstimasiMasukan'
+
+HasilJadikanSpk:
+  type: object
+  description: |
+    Hasil konversi: booking sesudah berstatus `CONVERTED` dan SPK barunya
+    (sama dengan `GET /api/work-orders/{number}` sesudah konversi, termasuk
+    `trackingToken`).
+  additionalProperties: false
+  required: [booking, workOrder]
+  properties:
+    booking:
+      $ref: '#/Booking'
+    workOrder:
+      $ref: './spk.yaml#/SpkDetail'

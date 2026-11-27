@@ -1,0 +1,237 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+staffList:
+  get:
+    operationId: daftarStaf
+    tags: [Kelola Staf]
+    summary: Semua akun staf
+    description: |
+      Khusus pemilik (kasir dan mekanik → 403). Semua staf, termasuk yang
+      nonaktif, tanpa paginasi (`{data: [...]}` tanpa `meta`). Urut `name`
+      naik menurut collation `utf8mb4_0900_ai_ci`, lalu `staff_id` naik.
+    security:
+      - tokenStaf: []
+    responses:
+      '200':
+        description: Daftar staf.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/staf.yaml#/Staf'
+            examples:
+              daftar:
+                $ref: '../components/examples/contoh.yaml#/DaftarStaf'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+  post:
+    operationId: buatStaf
+    tags: [Kelola Staf]
+    summary: Membuat akun staf (pemilik, kasir, atau mekanik)
+    description: |
+      Khusus pemilik. Urutan: 413 → 400 → 401 → 403 → 422 → 409
+      `email_taken` (email sudah dipakai staf mana pun, aktif atau tidak)
+      → 201. Staf baru selalu aktif. Sandi disimpan sebagai bcrypt cost 12.
+
+      **Serentak.** Pemeriksaan email dan INSERT berada dalam satu transaksi
+      yang lebih dulu mengunci baris `outlet` (`SELECT … FOR UPDATE`),
+      mutex yang sama dengan `PATCH /api/staff/{staffId}`. Hash bcrypt
+      dibuat sebelum transaksi supaya kunci tidak ditahan selama hashing.
+      Dua permintaan serentak dengan email yang sama → satu 201 dan satu
+      409 `email_taken`.
+    security:
+      - tokenStaf: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/staf.yaml#/BuatStafRequest'
+          example:
+            name: Andi Mekanik
+            email: andi@contoh.id
+            password: sandi-andi-123
+            role: mechanic
+    responses:
+      '201':
+        description: Staf dibuat.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/staf.yaml#/Staf'
+            example:
+              data:
+                staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000003
+                name: Andi Mekanik
+                email: andi@contoh.id
+                role: mechanic
+                isActive: true
+                createdAt: '2026-11-27T02:10:00.000Z'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '409':
+        description: '`email_taken`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: email_taken
+                message: Email sudah terdaftar
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+staff:
+  patch:
+    operationId: ubahStaf
+    tags: [Kelola Staf]
+    summary: Mengubah nama, email, sandi, peran, atau status aktif staf
+    description: |
+      Khusus pemilik. Urutan: 413 → 400 → 401 → 403 → 404 (staf tidak ada)
+      → 422 → 409 `email_taken` (email dipakai staf **lain**) → 409
+      `last_owner` → 200 dengan profil sesudah diubah.
+
+      - `last_owner`: perubahan ditolak bila sesudahnya tidak ada lagi staf
+        ber-`role` `owner` yang `isActive` `true`, termasuk pemilik terakhir
+        yang menonaktifkan atau menurunkan perannya sendiri.
+      - `isActive` menjadi `false` → semua sesi staf itu dihapus (termasuk
+        sesi peminta bila ia menonaktifkan dirinya sendiri); balasan 200
+        permintaan ini tetap dikirim. Staf nonaktif tidak bisa masuk (401
+        `invalid_credentials`) sampai diaktifkan lagi.
+      - Mekanik yang dinonaktifkan tetap tertera di SPK yang sudah
+        ditugaskan kepadanya, tetapi tidak bisa ditugaskan lagi
+        (`inactive_reference`) dan tidak muncul di `GET /api/mechanics`.
+      - `password` dikirim → hash baru disimpan dan semua sesi staf itu
+        dihapus, **kecuali** sesi yang dipakai untuk permintaan ini. Bila
+        `isActive: false` dikirim bersamaan, aturan nonaktif yang berlaku
+        (semua sesi dihapus).
+      - Perubahan `role` langsung berlaku untuk sesi yang sedang berjalan.
+        Mekanik yang diubah menjadi kasir tetap tertera di SPK lamanya.
+      - `email` diubah ke nilai yang sama dengan miliknya sendiri bukan
+        bentrok.
+
+      **Serentak.** Pemeriksaan 409 dan perubahan berada dalam satu
+      transaksi yang lebih dulu mengunci baris `outlet` (`SELECT … FOR
+      UPDATE`, mutex untuk semua perubahan staf), baru mengunci baris staf
+      target dan semua pemilik aktif. Dua pemilik terakhir yang saling
+      menurunkan atau saling menonaktifkan serentak menghasilkan tepat satu
+      200; yang lain 409 `last_owner` (atau 403/401 bila perubahan pemenang
+      sudah berlaku sebelum permintaan itu diautentikasi), tidak pernah 200
+      atau 500. Hash sandi baru dibuat sebelum transaksi.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/StaffId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/staf.yaml#/UbahStafRequest'
+          example:
+            isActive: false
+    responses:
+      '200':
+        description: Staf sesudah diubah.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/staf.yaml#/Staf'
+            example:
+              data:
+                staffId: 0b7c2f4e-1a2b-4c3d-8e9f-000000000003
+                name: Andi Mekanik
+                email: andi@contoh.id
+                role: mechanic
+                isActive: false
+                createdAt: '2026-11-27T02:10:00.000Z'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`email_taken` atau `last_owner`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            example:
+              error:
+                code: last_owner
+                message: Harus tetap ada setidaknya satu pemilik yang aktif
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+mechanics:
+  get:
+    operationId: daftarMekanik
+    tags: [Kelola Staf]
+    summary: Mekanik aktif yang bisa ditugaskan
+    description: |
+      Pemilik dan kasir (mekanik → 403). Dipakai pilihan mekanik di SPK baru
+      dan rincian SPK, karena `GET /api/staff` khusus pemilik. Hanya staf
+      ber-`role` `mechanic` yang aktif, tanpa paginasi, urut `name` naik
+      (collation `utf8mb4_0900_ai_ci`) lalu `staffId` naik. Tidak memuat email.
+    security:
+      - tokenStaf: []
+    responses:
+      '200':
+        description: Mekanik aktif.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/staf.yaml#/StafRingkas'
+            examples:
+              daftar:
+                $ref: '../components/examples/contoh.yaml#/DaftarMekanik'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

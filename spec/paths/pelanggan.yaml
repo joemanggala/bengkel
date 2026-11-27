@@ -1,0 +1,430 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+customers:
+  get:
+    operationId: daftarPelanggan
+    tags: [Pelanggan dan Kendaraan]
+    summary: Mencari pelanggan
+    description: |
+      Pemilik dan kasir (mekanik → 403). Urutan pemeriksaan: 401 → 403 → 422
+      (query) → 200. `search` mencocokkan **nama**, **nomor HP**, atau
+      **plat** salah satu kendaraannya (aturan cocok di parameter `search`).
+      Urut `name` naik menurut collation `utf8mb4_0900_ai_ci`, lalu
+      `customer_id` naik. Setiap baris memuat semua kendaraannya, supaya
+      layar SPK baru tidak perlu memanggil rincian satu per satu.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/Search'
+      - $ref: '../components/parameters/umum.yaml#/Page'
+      - $ref: '../components/parameters/umum.yaml#/Limit'
+    responses:
+      '200':
+        description: Satu halaman pelanggan.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/pelanggan.yaml#/Pelanggan'
+                meta:
+                  $ref: '../components/schemas/umum.yaml#/Meta'
+            examples:
+              daftar:
+                $ref: '../components/examples/contoh.yaml#/DaftarPelanggan'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+  post:
+    operationId: buatPelanggan
+    tags: [Pelanggan dan Kendaraan]
+    summary: Mencatat pelanggan baru
+    description: |
+      Pemilik dan kasir. Urutan: 413 → 400 → 401 → 403 → 422 → 409
+      `phone_taken` (nomor bentuk seragam sudah dipakai pelanggan lain) →
+      201 dengan `vehicles` kosong. Kendaraan ditambahkan lewat
+      `POST /api/customers/{customerId}/vehicles`. Dua permintaan serentak
+      dengan nomor yang sama → satu 201 dan satu 409 (galat kunci ganda
+      MySQL errno 1062 dipetakan ke 409, bukan 500).
+    security:
+      - tokenStaf: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/pelanggan.yaml#/BuatPelangganRequest'
+          example:
+            name: Budi Santoso
+            phone: 0812-3456-7890
+            address: Jl. Kenanga 5
+    responses:
+      '201':
+        description: Pelanggan dibuat.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/pelanggan.yaml#/Pelanggan'
+            example:
+              data:
+                customerId: 1c1c1c1c-0000-4000-8000-000000000001
+                name: Budi Santoso
+                phone: '6281234567890'
+                address: Jl. Kenanga 5
+                notes: ''
+                vehicles: []
+                createdAt: '2026-11-28T01:00:00.000Z'
+                updatedAt: '2026-11-28T01:00:00.000Z'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '409':
+        description: '`phone_taken`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              nomorDipakai:
+                $ref: '../components/examples/contoh.yaml#/GalatPhoneTaken'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+customer:
+  get:
+    operationId: detailPelanggan
+    tags: [Pelanggan dan Kendaraan]
+    summary: Satu pelanggan beserta kendaraannya
+    description: |
+      Pemilik dan kasir. Urutan: 401 → 403 → 404 → 200. Riwayat servis per
+      kendaraan ada di `GET /api/vehicles/{vehicleId}/work-orders`.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/CustomerId'
+    responses:
+      '200':
+        description: Pelanggan.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/pelanggan.yaml#/Pelanggan'
+            examples:
+              pelanggan:
+                $ref: '../components/examples/contoh.yaml#/Pelanggan'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+  patch:
+    operationId: ubahPelanggan
+    tags: [Pelanggan dan Kendaraan]
+    summary: Mengubah data pelanggan
+    description: |
+      Pemilik dan kasir. Urutan: 413 → 400 → 401 → 403 → 404 → 422 → 409
+      `phone_taken` (nomor dipakai pelanggan **lain**; nomor yang sama
+      dengan miliknya sendiri bukan bentrok) → 200 dengan data sesudah
+      diubah.
+
+      Nama dan nomor HP di SPK dan nota selalu dibaca dari data pelanggan
+      saat ini, jadi perubahan langsung tampil di SPK lama juga. Booking
+      menyimpan salinannya sendiri dan tidak berubah.
+
+      **Serentak.** Baris pelanggan dibaca dengan `SELECT … FOR UPDATE` di
+      transaksi yang sama dengan `UPDATE`, dan `UPDATE` hanya menyentuh
+      field yang dikirim, sehingga dua PATCH serentak yang mengubah field
+      berbeda sama-sama bertahan.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/CustomerId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/pelanggan.yaml#/UbahPelangganRequest'
+          example:
+            notes: Langganan, minta dihubungi sebelum ganti part.
+    responses:
+      '200':
+        description: Pelanggan sesudah diubah.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/pelanggan.yaml#/Pelanggan'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`phone_taken`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              nomorDipakai:
+                $ref: '../components/examples/contoh.yaml#/GalatPhoneTaken'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+customerVehicles:
+  post:
+    operationId: tambahKendaraan
+    tags: [Pelanggan dan Kendaraan]
+    summary: Menambah kendaraan untuk pelanggan
+    description: |
+      Pemilik dan kasir. Urutan: 413 → 400 → 401 → 403 → 404 (pelanggan
+      tidak ada) → 422 → 409 `plate_taken` (kunci plat sudah dipakai
+      kendaraan mana pun, milik pelanggan ini maupun pelanggan lain) → 201
+      dengan kendaraan baru. Plat kembar yang dibuat serentak → satu 201 dan
+      satu 409 (errno 1062 dipetakan ke 409).
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/CustomerId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/pelanggan.yaml#/BuatKendaraanRequest'
+          example:
+            type: MOTOR
+            plate: b1234xyz
+            brand: Honda
+            model: Vario 125
+            year: 2021
+            color: Hitam
+    responses:
+      '201':
+        description: Kendaraan dibuat.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/pelanggan.yaml#/Kendaraan'
+            examples:
+              baru:
+                $ref: '../components/examples/contoh.yaml#/Kendaraan'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`plate_taken`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              platDipakai:
+                $ref: '../components/examples/contoh.yaml#/GalatPlateTaken'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+vehicles:
+  get:
+    operationId: cariKendaraan
+    tags: [Pelanggan dan Kendaraan]
+    summary: Mencari kendaraan dari plat
+    description: |
+      Pemilik dan kasir. Urutan: 401 → 403 → 422 (query) → 200. Kendaraan
+      yang kunci platnya **memuat** hasil normalisasi `plate` (lihat
+      parameter), beserta pemiliknya. Urutan: kunci plat yang sama persis
+      dulu, lalu kunci plat naik (urutan biner), lalu `vehicleId` naik.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/PlateQuery'
+      - $ref: '../components/parameters/umum.yaml#/Page'
+      - $ref: '../components/parameters/umum.yaml#/Limit'
+    responses:
+      '200':
+        description: Satu halaman kendaraan.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/pelanggan.yaml#/KendaraanDenganPemilik'
+                meta:
+                  $ref: '../components/schemas/umum.yaml#/Meta'
+            examples:
+              hasil:
+                $ref: '../components/examples/contoh.yaml#/CariPlat'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+vehicle:
+  patch:
+    operationId: ubahKendaraan
+    tags: [Pelanggan dan Kendaraan]
+    summary: Mengubah data kendaraan
+    description: |
+      Pemilik dan kasir. Urutan: 413 → 400 → 401 → 403 → 404 → 422 → 409
+      `plate_taken` (kunci plat dipakai kendaraan **lain**) → 200 dengan
+      kendaraan sesudah diubah. Plat, merek, dan tipe di SPK lama ikut
+      berubah karena SPK membaca data kendaraan saat ini. Baris dikunci
+      (`SELECT … FOR UPDATE`) dan hanya field yang dikirim yang diubah.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/VehicleId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/pelanggan.yaml#/UbahKendaraanRequest'
+          example:
+            color: Merah
+    responses:
+      '200':
+        description: Kendaraan sesudah diubah.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/pelanggan.yaml#/Kendaraan'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`plate_taken`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              platDipakai:
+                $ref: '../components/examples/contoh.yaml#/GalatPlateTaken'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+vehicleWorkOrders:
+  get:
+    operationId: riwayatServisKendaraan
+    tags: [Pelanggan dan Kendaraan]
+    summary: Riwayat servis satu kendaraan
+    description: |
+      Pemilik dan kasir. Urutan: 401 → 403 → 404 (kendaraan tidak ada) →
+      422 (query) → 200. Semua SPK kendaraan itu, termasuk yang dibatalkan,
+      urut `created_at` terbaru dulu, lalu `work_order_id` turun.
+    security:
+      - tokenStaf: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/VehicleId'
+      - $ref: '../components/parameters/umum.yaml#/Page'
+      - $ref: '../components/parameters/umum.yaml#/Limit'
+    responses:
+      '200':
+        description: Satu halaman SPK.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data, meta]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/spk.yaml#/SpkRingkas'
+                meta:
+                  $ref: '../components/schemas/umum.yaml#/Meta'
+            examples:
+              riwayat:
+                $ref: '../components/examples/contoh.yaml#/DaftarSpk'
+      '401':
+        $ref: '../components/responses/galat.yaml#/Unauthenticated'
+      '403':
+        $ref: '../components/responses/galat.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses/galat.yaml#/Unprocessable'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

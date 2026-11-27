@@ -1,0 +1,241 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+services:
+  get:
+    operationId: jasaPublik
+    tags: [Publik]
+    summary: Daftar jasa dan harga untuk website
+    description: |
+      Publik, tanpa token (token apa pun yang dikirim diabaikan). Hanya jasa
+      yang `isActive` **dan** `isPublic`, satu respons tanpa paginasi. Urut
+      `sortOrder` naik, lalu `name` naik (collation `utf8mb4_0900_ai_ci`),
+      lalu `serviceId` naik. Dipakai halaman depan dan pilihan jasa di form
+      booking.
+    security: []
+    responses:
+      '200':
+        description: Jasa yang tampil di website.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/jasa.yaml#/JasaPublik'
+            examples:
+              daftar:
+                $ref: '../components/examples/contoh.yaml#/JasaPublik'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+bookings:
+  post:
+    operationId: buatBookingPublik
+    tags: [Publik]
+    summary: Pelanggan membuat booking servis dari website tanpa akun
+    description: |
+      Publik. Urutan: 413 → 400 → 422 → 409 `too_many_pending_bookings` →
+      201. Rute publik tidak memeriksa `Authorization` sama sekali, jadi
+      tidak ada 401 dan 403.
+
+      Setelah validasi lolos, dalam **satu transaksi**:
+      1. Baris `counters` `booking_number` dikunci (`SELECT … FOR UPDATE`).
+         Kunci ini sekaligus menjadi mutex untuk batas booking menunggu,
+         sehingga booking serentak dengan nomor HP yang sama tidak pernah
+         melampaui batas.
+      2. Booking berstatus `PENDING` dengan nomor HP (bentuk seragam) yang
+         sama sudah 3 atau lebih → 409 `too_many_pending_bookings`; nomor
+         booking tidak terpakai. Booking yang sudah dikonfirmasi, ditolak,
+         dibatalkan, atau dijadikan SPK tidak dihitung.
+      3. Penghitung dinaikkan satu; nomor = `B-` + nilai itu, diisi nol di
+         depan sampai minimal 4 digit (`B-0001`, `B-10000`), berurutan tanpa
+         celah.
+      4. Booking disimpan `PENDING` dengan salinan isian form, kunci dan
+         tampilan plat, dan salinan nama jasa (bila memilih jasa).
+      5. Token booking 32 byte acak kriptografis dibuat, dikodekan base64url
+         tanpa padding; yang disimpan hanya hex SHA-256 atas byte ASCII
+         token itu.
+
+      **Tidak ada pesan WhatsApp** yang dikirim saat booking dibuat, karena
+      nomor di form bisa milik orang lain. Pesan pertama dikirim saat staf
+      mengonfirmasi atau menolak. Pelanggan atau kendaraan di database
+      **tidak** dibuat di sini; baru saat booking dijadikan SPK.
+
+      Rute ini bisa dipanggil siapa saja, jadi batas jumlah permintaan per
+      alamat IP dipasang di proxy (lihat panduan produksi); batas 3 booking
+      menunggu per nomor adalah pengaman terakhir di dalam aplikasi.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/booking.yaml#/BuatBookingRequest'
+          example:
+            customerName: Budi Santoso
+            phone: 0812-3456-7890
+            vehicleType: MOTOR
+            plate: b 1234 xyz
+            vehicleBrand: Honda
+            vehicleModel: Vario 125
+            serviceId: 3e3e3e3e-0000-4000-8000-000000000001
+            visitDate: '2026-11-28'
+            complaint: Rem depan bunyi saat dipakai.
+    responses:
+      '201':
+        description: Booking diterima sistem dan menunggu konfirmasi staf. `bookingToken` hanya ada di balasan ini.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/booking.yaml#/BookingDibuat'
+            examples:
+              berhasil:
+                $ref: '../components/examples/contoh.yaml#/BookingDibuat'
+      '400':
+        $ref: '../components/responses/galat.yaml#/BadRequest'
+      '409':
+        description: '`too_many_pending_bookings`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              menumpuk:
+                $ref: '../components/examples/contoh.yaml#/GalatBookingMenumpuk'
+      '413':
+        $ref: '../components/responses/galat.yaml#/PayloadTooLarge'
+      '422':
+        description: '`validation_failed`, selalu dengan `fields`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              validasi:
+                $ref: '../components/examples/contoh.yaml#/GalatValidasiBooking'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+booking:
+  get:
+    operationId: detailBookingPublik
+    tags: [Publik]
+    summary: Pelanggan melihat bookingnya dengan token booking
+    description: |
+      Publik. Urutan: 404 → 200. Halaman `/booking/{bookingToken}` memanggilnya
+      berkala untuk menampilkan status terbaru. Bentuk balasan dibatasi skema
+      `BookingPublik` (tanpa data staf, status WhatsApp, dan nomor HP utuh).
+    security: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/BookingToken'
+    responses:
+      '200':
+        description: Booking.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/booking.yaml#/BookingPublik'
+            examples:
+              ditolak:
+                $ref: '../components/examples/contoh.yaml#/BookingPublikDitolak'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+bookingCancel:
+  post:
+    operationId: batalkanBookingPublik
+    tags: [Publik]
+    summary: Pelanggan membatalkan bookingnya selagi menunggu
+    description: |
+      Publik. Tanpa badan (badan diabaikan, termasuk JSON rusak). Urutan:
+      404 → 409 `booking_transition_invalid` → 200 dengan booking sesudah
+      dibatalkan.
+
+      - Hanya booking `PENDING` yang bisa dibatalkan pelanggan; status lain,
+        termasuk yang sudah `CANCELLED` atau `CONFIRMED`, → 409
+        `booking_transition_invalid`. Sesudah dikonfirmasi, pelanggan
+        menghubungi bengkel bila batal datang.
+      - Berhasil: status `CANCELLED`, dalam satu transaksi yang mengunci
+        baris booking. Pembatalan serentak dengan konfirmasi atau konversi
+        oleh staf menghasilkan tepat satu pemenang; yang kalah mendapat 409
+        `booking_transition_invalid`. Tidak ada pesan WhatsApp.
+    security: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/BookingToken'
+    responses:
+      '200':
+        description: Booking dibatalkan.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/booking.yaml#/BookingPublik'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '409':
+        description: '`booking_transition_invalid`.'
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Galat'
+            examples:
+              transisi:
+                $ref: '../components/examples/contoh.yaml#/GalatBookingTransisi'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
+
+workOrder:
+  get:
+    operationId: lacakServisPublik
+    tags: [Publik]
+    summary: Pelanggan melacak servis dan melihat nota online dengan token lacak
+    description: |
+      Publik. Urutan: 404 → 200. Halaman `/servis/{trackingToken}` memanggilnya
+      berkala untuk menampilkan status terbaru, dan halaman yang sama menjadi
+      nota online. Token yang sudah dibuat ulang → 404. SPK `CANCELLED`
+      tetap bisa dilihat (dengan `cancelReason`). Bentuk balasan dibatasi
+      skema `SpkPublik`: tanpa nama mekanik, diagnosis, catatan linimasa,
+      data staf, harga beli, dan nomor HP utuh.
+    security: []
+    parameters:
+      - $ref: '../components/parameters/umum.yaml#/TrackingToken'
+    responses:
+      '200':
+        description: SPK.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/spk.yaml#/SpkPublik'
+            examples:
+              selesai:
+                $ref: '../components/examples/contoh.yaml#/SpkPublik'
+      '404':
+        $ref: '../components/responses/galat.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'

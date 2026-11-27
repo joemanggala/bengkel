@@ -1,0 +1,340 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+Sku:
+  type: string
+  description: |
+    Kode barang. Dipangkas, lalu huruf a-z diubah menjadi A-Z. Kosong →
+    `required`; lebih dari 40 karakter → `too_long`; tidak cocok dengan
+    `^[A-Z0-9][A-Z0-9._/-]*$` (huruf besar, angka, titik, garis bawah,
+    garis miring, tanda hubung; diawali huruf atau angka; tanpa spasi) →
+    `invalid_format`. Unik persis (`sku_taken`); karena huruf kecil
+    dibesarkan, `oli-10w40` dan `OLI-10W40` sama. (Pola ini dinilai sesudah
+    huruf dibesarkan, jadi tidak ditulis sebagai `pattern` skema masukan.)
+  maxLength: 40
+
+NamaSparepart:
+  type: string
+  description: |
+    Dipangkas. Kosong → `required`; kurang dari 2 karakter → `too_short`;
+    lebih dari 100 karakter → `too_long`. Boleh kembar (SKU yang unik).
+  minLength: 2
+  maxLength: 100
+
+SatuanSparepart:
+  type: string
+  description: |
+    Satuan jual yang ditampilkan ("pcs", "botol", "set", "liter"). Dipangkas.
+    Kosong → `required`; lebih dari 20 karakter → `too_long`. Hanya label.
+    Jumlah selalu bilangan bulat dan item SPK paling banyak 99 per baris,
+    jadi pakai satuan jual (botol, bukan ml).
+  minLength: 1
+  maxLength: 20
+
+HargaSparepart:
+  type: integer
+  description: |
+    Rupiah bulat, 0 sampai 100.000.000. Tidak dikirim atau `null` →
+    `required` (saat membuat); bukan integer → `invalid_type`; di luar
+    rentang → `out_of_range`.
+  minimum: 0
+  maximum: 100000000
+
+HargaBeliSparepart:
+  type: integer
+  description: |
+    Harga beli (modal) per satuan, rupiah bulat, 0 sampai 100.000.000. 0 =
+    belum diisi. Boleh lebih besar dari harga jual. Bukan integer (termasuk
+    `null`) → `invalid_type`; di luar rentang → `out_of_range`. Tidak
+    dikirim saat membuat = 0; tidak dikirim saat mengubah = tidak berubah.
+  minimum: 0
+  maximum: 100000000
+
+StokMinimum:
+  type: integer
+  description: |
+    Batas stok menipis, 0 sampai 100.000.000. Bukan integer (termasuk
+    `null`) → `invalid_type`; di luar rentang → `out_of_range`. Tidak
+    dikirim saat membuat = 0; tidak dikirim saat mengubah = tidak berubah.
+  minimum: 0
+  maximum: 100000000
+
+JumlahStok:
+  type: integer
+  description: |
+    Jumlah dalam satuan sparepart, 1 sampai 100.000.000. Tidak dikirim atau
+    `null` → `required`; bukan integer → `invalid_type`; di luar rentang →
+    `out_of_range`.
+  minimum: 1
+  maximum: 100000000
+
+CatatanStok:
+  type: string
+  description: |
+    Dipangkas, paling banyak 200 karakter (lebih → `too_long`). Bukan string →
+    `invalid_type`. Boleh kosong di `stock-in`; wajib di `stock-out` dan
+    `stock-count` (kosong → `required`).
+  maxLength: 200
+
+LevelStok:
+  type: string
+  description: |
+    Dihitung server dari `stock` dan `minStock`, supaya semua klien
+    menampilkan tanda yang sama:
+
+    - `out`: `stock` = 0.
+    - `low`: `stock` > 0 dan `stock` <= `minStock`.
+    - `ok`: `stock` > `minStock`.
+
+    Jadi `lowStock=true` (`stock` <= `minStock`) sama dengan `low` atau
+    `out`.
+  enum: [ok, low, out]
+  x-label:
+    ok: Aman
+    low: Menipis
+    out: Habis
+
+SparepartStaf:
+  type: object
+  description: |
+    Sparepart seperti dilihat **kasir dan mekanik**: tanpa harga beli.
+    Kunci `costPrice` **tidak ada sama sekali** (bukan `null`, bukan 0).
+    Objek ini tertutup, jadi respons kasir yang memuat `costPrice` tidak
+    sesuai kontrak.
+  additionalProperties: false
+  required: [partId, sku, name, unit, price, stock, minStock, stockLevel, isActive, createdAt, updatedAt]
+  properties:
+    partId:
+      $ref: './umum.yaml#/Uuid'
+    sku:
+      type: string
+      pattern: '^[A-Z0-9][A-Z0-9._/-]{0,39}$'
+    name:
+      type: string
+    unit:
+      type: string
+    price:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+      description: Harga jual per satuan; selalu dipakai apa adanya saat part ditambahkan ke SPK.
+    stock:
+      type: integer
+      minimum: 0
+      description: Stok sekarang. Tidak pernah negatif dan hanya berubah lewat kartu stok.
+    minStock:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+    stockLevel:
+      $ref: '#/LevelStok'
+    isActive:
+      type: boolean
+      description: '`false` = tidak bisa ditambahkan ke SPK (`inactive_reference`); stoknya tetap bisa dicatat.'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+SparepartPemilik:
+  type: object
+  description: Sparepart seperti dilihat **pemilik**, dengan harga beli (`costPrice` selalu ada).
+  additionalProperties: false
+  required: [partId, sku, name, unit, price, costPrice, stock, minStock, stockLevel, isActive, createdAt, updatedAt]
+  properties:
+    partId:
+      $ref: './umum.yaml#/Uuid'
+    sku:
+      type: string
+      pattern: '^[A-Z0-9][A-Z0-9._/-]{0,39}$'
+    name:
+      type: string
+    unit:
+      type: string
+    price:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+    costPrice:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+      description: Harga beli per satuan; 0 bila belum diisi. Disalin ke item SPK saat part ditambahkan, untuk laba di rekap.
+    stock:
+      type: integer
+      minimum: 0
+    minStock:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+    stockLevel:
+      $ref: '#/LevelStok'
+    isActive:
+      type: boolean
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+BuatSparepartRequest:
+  type: object
+  description: |
+    Field lain di badan diabaikan. Sparepart baru selalu aktif. Opsional:
+    `costPrice` (bawaan 0), `minStock` (bawaan 0), `initialStock` (bawaan
+    0; bila lebih dari 0 ikut dicatat sebagai satu baris kartu stok `IN`
+    bercatatan `Stok awal` dalam transaksi yang sama).
+  required: [sku, name, unit, price]
+  properties:
+    sku:
+      $ref: '#/Sku'
+    name:
+      $ref: '#/NamaSparepart'
+    unit:
+      $ref: '#/SatuanSparepart'
+    price:
+      $ref: '#/HargaSparepart'
+    costPrice:
+      $ref: '#/HargaBeliSparepart'
+    minStock:
+      $ref: '#/StokMinimum'
+    initialStock:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+      description: Opsional, bawaan 0. Bukan integer (termasuk `null`) → `invalid_type`; di luar rentang → `out_of_range`.
+
+UbahSparepartRequest:
+  type: object
+  description: |
+    Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
+    membalas 200 tanpa perubahan. `null` pada `sku`, `name`, `unit`, atau
+    `price` → `required`; `null` pada `costPrice`, `minStock`, atau
+    `isActive` → `invalid_type`. **Stok tidak bisa diubah di sini**, hanya
+    lewat `stock-in`, `stock-out`, `stock-count`, dan item SPK: field
+    `stock` di badan diabaikan seperti field lain yang tidak dikenal.
+    Mengubah harga tidak mengubah item SPK yang sudah ada.
+  properties:
+    sku:
+      $ref: '#/Sku'
+    name:
+      $ref: '#/NamaSparepart'
+    unit:
+      $ref: '#/SatuanSparepart'
+    price:
+      $ref: '#/HargaSparepart'
+    costPrice:
+      $ref: '#/HargaBeliSparepart'
+    minStock:
+      $ref: '#/StokMinimum'
+    isActive:
+      type: boolean
+
+StokMasukRequest:
+  type: object
+  description: Field lain di badan diabaikan.
+  required: [quantity]
+  properties:
+    quantity:
+      $ref: '#/JumlahStok'
+    costPrice:
+      allOf:
+        - $ref: '#/HargaBeliSparepart'
+      description: |
+        Opsional: harga beli per satuan pada pembelian ini. Bila dikirim,
+        nilai itu menjadi `costPrice` sparepart (harga beli terakhir); tidak
+        dikirim = tidak berubah.
+    note:
+      $ref: '#/CatatanStok'
+
+StokKeluarRequest:
+  type: object
+  description: |
+    Pengeluaran manual (rusak, hilang, dipakai sendiri). Part yang dipasang
+    ke kendaraan pelanggan dikurangi lewat item SPK, bukan lewat rute ini.
+    Field lain di badan diabaikan.
+  required: [quantity, note]
+  properties:
+    quantity:
+      allOf:
+        - $ref: '#/JumlahStok'
+      description: Lebih besar dari stok sekarang → 409 `insufficient_stock` (dinilai sesudah 422).
+    note:
+      allOf:
+        - $ref: '#/CatatanStok'
+      description: Alasan keluar, wajib. Tidak dikirim, `null`, atau kosong → `required`.
+
+HitungStokRequest:
+  type: object
+  description: |
+    Hitung ulang (opname): stok menjadi angka yang kamu hitung. Selisihnya
+    (hitungan dikurangi stok sebelumnya, boleh 0) dicatat sebagai satu baris
+    kartu stok `COUNT`. Field lain di badan diabaikan.
+  required: [countedStock, note]
+  properties:
+    countedStock:
+      type: integer
+      minimum: 0
+      maximum: 100000000
+      description: |
+        Stok hasil hitung. Tidak dikirim atau `null` → `required`; bukan
+        integer → `invalid_type`; di luar 0..100.000.000 → `out_of_range`.
+    note:
+      allOf:
+        - $ref: '#/CatatanStok'
+      description: Catatan hitung ulang, wajib (mis. "Opname akhir bulan"). Tidak dikirim, `null`, atau kosong → `required`.
+
+JenisPergerakan:
+  type: string
+  description: |
+    - `IN`: stok masuk (belanja, stok awal). `quantity` positif.
+    - `OUT`: keluar manual, wajib catatan. `quantity` negatif.
+    - `COUNT`: hasil hitung ulang, wajib catatan. `quantity` = selisihnya,
+      boleh positif, negatif, atau 0.
+    - `USED`: terpakai karena ditambahkan ke SPK. `quantity` negatif =
+      jumlah item.
+    - `RETURNED`: kembali karena item part dihapus dari SPK atau SPK
+      dibatalkan. `quantity` positif.
+  enum: [IN, OUT, COUNT, USED, RETURNED]
+  x-label:
+    IN: Stok masuk
+    OUT: Stok keluar
+    COUNT: Hitung ulang
+    USED: Terpakai SPK
+    RETURNED: Dikembalikan dari SPK
+
+PergerakanStok:
+  type: object
+  description: Satu baris kartu stok. Tidak pernah diubah atau dihapus.
+  additionalProperties: false
+  required: [movementId, type, quantity, stockAfter, note, workOrderNumber, staff, createdAt]
+  properties:
+    movementId:
+      $ref: './umum.yaml#/Uuid'
+    type:
+      $ref: '#/JenisPergerakan'
+    quantity:
+      type: integer
+      description: Perubahan stok bertanda (negatif = berkurang).
+    stockAfter:
+      type: integer
+      minimum: 0
+      description: Stok sesudah perubahan ini.
+    note:
+      type: string
+      description: |
+        Catatan staf untuk `IN`, `OUT`, `COUNT` (`Stok awal` untuk stok awal
+        saat sparepart dibuat). Untuk `USED` dan `RETURNED` string kosong.
+    workOrderNumber:
+      description: Nomor SPK penyebabnya; hanya terisi untuk `USED` dan `RETURNED`.
+      oneOf:
+        - $ref: './spk.yaml#/NomorSpk'
+        - type: 'null'
+    staff:
+      $ref: './staf.yaml#/StafRingkas'
+    createdAt:
+      type: string
+      format: date-time

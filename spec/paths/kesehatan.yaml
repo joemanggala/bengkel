@@ -1,0 +1,24 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+health:
+  get:
+    operationId: cekKesehatan
+    tags: [Kesehatan]
+    summary: Memeriksa backend hidup
+    description: |
+      Publik. Selalu membalas `{"status": "ok"}` (tanpa pembungkus `data`)
+      selama proses backend bisa menerima permintaan. Rute ini cocok dipakai
+      untuk menunggu backend siap setelah dinyalakan.
+    security: []
+    responses:
+      '200':
+        description: Backend siap.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/umum.yaml#/Kesehatan'
+            example:
+              status: ok
+      '500':
+        $ref: '../components/responses/galat.yaml#/InternalError'
