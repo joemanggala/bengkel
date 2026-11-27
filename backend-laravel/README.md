@@ -7,11 +7,17 @@ harian. Ditulis dengan Laravel 13 di PHP 8.4, memakai Query Builder
 `DB::table()` + MySQL tanpa Eloquent, sesi Bearer di database, dan pesan
 WhatsApp lewat API kirim berbentuk Fonnte.
 
-Perilakunya ditetapkan oleh kontrak OpenAPI di `../spec`, dan kontrak yang
-sama dipakai semua varian backend produk ini (Laravel lebih dulu, Go dan
-NestJS menyusul). Karena itu web Next.js bisa berpindah backend cukup dengan
-mengganti alamat API, dan satu database bisa dipakai bergantian oleh semua
-varian (hash sandi, token sesi, nomor SPK, dan semua aturannya sama).
+Perilakunya ditetapkan oleh kontrak OpenAPI di `../spec`, bukan oleh kode
+ini. Web Next.js hanya berbicara lewat kontrak itu, jadi backend lain yang
+mengikuti kontrak yang sama bisa menggantikan backend ini cukup dengan
+mengganti alamat API, dan database yang sama tetap terbaca (hash sandi, token
+sesi, nomor SPK, dan semua aturannya ditetapkan di kontrak).
+
+<!-- kemas:abaikan-mulai -->
+Di repo ini kontrak yang sama dipakai semua varian backend (Laravel lebih
+dulu, Go dan NestJS menyusul).
+
+<!-- kemas:abaikan-selesai -->
 
 Semua 52 operasi di kontrak sudah diimplementasikan: setup dan staf (tiga
 peran: pemilik, kasir, mekanik), profil outlet, pelanggan dan kendaraan beserta
@@ -22,8 +28,9 @@ jasa dan part dengan stok yang berkurang dan kembali otomatis, pembayaran
 bertahap, pembatalan, WhatsApp, tautan lacak), halaman lacak servis publik,
 dan rekap harian beserta laba kotor.
 
-Dependensi langsung, versinya dipatok persis di `composer.json` (sama dengan
-backend Laravel produk KodeCoding lain):
+Dependensi langsung, versinya dipatok persis di `composer.json` supaya
+`composer install` di mesin mana pun memasang versi yang sama dengan yang
+sudah diuji:
 
 | Paket | Untuk |
 |---|---|
@@ -155,9 +162,10 @@ memakai `staff`, sehingga header `Authorization` diabaikan sepenuhnya.
   menyimpan hex SHA-256-nya. Sesi 30 hari, bergeser; perpanjangan ditulis
   paling sering sekali per 5 menit. Peran dibaca dari database setiap
   permintaan; staf nonaktif langsung kehilangan aksesnya.
-- **Sandi bcrypt cost 12.** PHP menulis awalan `$2y$`; awalan `$2a$` (Go) dan
-  `$2b$` (Node) juga diterima karena algoritmanya sama. Diuji dengan hash
-  fixtur buatan ketiga bahasa.
+- **Sandi bcrypt cost 12.** PHP menulis awalan `$2y$`; awalan `$2a$` dan
+  `$2b$` (ditulis pustaka bcrypt bahasa lain) juga diterima karena
+  algoritmanya sama, jadi hash yang dibuat aplikasi lain di database yang sama
+  tetap bisa dipakai masuk. Diuji dengan hash fixtur untuk ketiga awalan.
 - **Jam aplikasi** (`Support/Time/Clock`): UTC, dipotong ke milidetik,
   ditulis ke `DATETIME(3)` dengan format `Y-m-d H:i:s.v`; koneksi MySQL
   memasang `timezone` `+00:00`. `NOW()` MySQL tidak dipakai. WIB (UTC+7
@@ -166,7 +174,7 @@ memakai `staff`, sehingga header `Authorization` diabaikan sepenuhnya.
 - **Server HTTP dev: `php -S` lewat `php artisan bengkel:serve`.**
   `php artisan serve` bawaan tidak dipakai karena membaca port dari `--port`,
   bukan env `PORT` bersama; membuang env dari shell selama ada berkas `.env`
-  (padahal tes kontrak memberi env lewat baris perintah); tidak memeriksa env
+  (padahal env dari shell seharusnya menang, lihat Konfigurasi); tidak memeriksa env
   dan database sebelum menyala; dan router-nya melayani berkas statis.
   `bengkel:serve` menjalankan pemeriksaan `bengkel:periksa` lebih dulu, lalu
   server bawaan PHP dengan `enable_post_data_reading=0`, `display_errors=0`

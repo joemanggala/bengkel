@@ -12,7 +12,7 @@ use DateTimeImmutable;
 /**
  * Bacaan untuk rekap harian. Setiap metode menerima rentang UTC satu hari WIB
  * [mulai, akhir). "SPK selesai hari itu" = SPK yang baris linimasa DONE-nya
- * jatuh di rentang itu (keputusan 0a-9). Semua metode dipanggil di dalam
+ * jatuh di rentang itu (lihat RekapService). Semua metode dipanggil di dalam
  * dalamPotret(), supaya angka-angkanya berasal dari satu keadaan database.
  */
 interface RekapRepositoryInterface

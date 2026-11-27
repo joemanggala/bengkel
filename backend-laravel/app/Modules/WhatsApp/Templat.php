@@ -27,7 +27,7 @@ use App\Support\Time\Wib;
  */
 final class Templat
 {
-    /** 5.1 booking_confirmed. Tidak memuat nama, merek, atau keluhan ketikan pemesan (0a-11). */
+    /** 5.1 booking_confirmed. Tidak memuat nama, merek, atau keluhan ketikan pemesan: nomor di form publik tidak diverifikasi, jadi form itu tidak boleh bisa dipakai mengirim teks bebas atas nama bengkel. */
     public static function bookingDikonfirmasi(ProfilOutlet $outlet, string $number, string $plate, string $visitDate, ?string $serviceName): string
     {
         return self::susun([

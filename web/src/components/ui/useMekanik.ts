@@ -8,8 +8,8 @@ import { klienStaf } from '@/klien/peramban'
 import type { StafRingkas } from '@/skema/staf'
 import type { OpsiPilihan } from './Pilihan'
 
-// Mekanik aktif untuk pilihan penugasan, dari GET /api/mechanics (pemilik dan kasir; keputusan
-// Bagian 0a nomor 0a-2, karena GET /api/staff khusus pemilik). `aktif` false = tidak memuat,
+// Mekanik aktif untuk pilihan penugasan, dari GET /api/mechanics (pemilik dan kasir). Rute ini
+// ada karena kasir menugaskan mekanik, sedangkan GET /api/staff khusus pemilik. `aktif` false = tidak memuat,
 // mis. untuk mekanik yang memang tidak boleh memanggil rute ini.
 export function useMekanik(aktif = true): StafRingkas[] {
     const [mekanik, setMekanik] = useState<StafRingkas[]>([])

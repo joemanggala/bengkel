@@ -5,14 +5,14 @@ import type { KodeGalat } from '@/skema/galat'
 import type { StatusBayar, StatusSpk, StatusTujuanSpk } from '@/skema/spk'
 import type { PeranStaf } from '@/skema/staf'
 
-// Aturan status SPK dari spec ("Status SPK") dan keputusan Bagian 0a, untuk menentukan tombol
+// Aturan status SPK dari spec ("Status SPK"), untuk menentukan tombol
 // mana yang tampil di layar. Backend tetap penentu akhirnya (409 bila tidak sah); aturan yang
 // sama di web hanya mencegah staf menekan tombol yang pasti ditolak.
 //
 //   QUEUED -> IN_PROGRESS <-> WAITING_PARTS;  IN_PROGRESS -> DONE -> PICKED_UP
 //   QUEUED, IN_PROGRESS, WAITING_PARTS -> CANCELLED (lewat rute cancel, bukan rute status)
 //
-// WAITING_PARTS tidak bisa langsung DONE (0a-4): pekerjaan dilanjutkan dulu.
+// WAITING_PARTS tidak bisa langsung DONE: pekerjaan dilanjutkan dulu sesudah part datang.
 
 export const TRANSISI_SPK: Readonly<Record<StatusSpk, readonly StatusTujuanSpk[]>> = {
     QUEUED: ['IN_PROGRESS'],
@@ -26,7 +26,8 @@ export const TRANSISI_SPK: Readonly<Record<StatusSpk, readonly StatusTujuanSpk[]
 // Mekanik hanya boleh memindahkan SPK miliknya ke tiga status ini (PICKED_UP -> 403).
 const TUJUAN_MEKANIK: readonly StatusTujuanSpk[] = ['IN_PROGRESS', 'WAITING_PARTS', 'DONE']
 
-// Status selama SPK masih bisa diubah: item, data SPK (PATCH), dan pembatalan (0a-5).
+// Status selama SPK masih bisa diubah: item, data SPK (PATCH), dan pembatalan. Sejak DONE nilai
+// SPK tetap, supaya rekap tanggal yang sudah lewat tidak berubah.
 export const STATUS_TERBUKA: readonly StatusSpk[] = ['QUEUED', 'IN_PROGRESS', 'WAITING_PARTS']
 
 // scope=active di daftar SPK: masih di bengkel, termasuk DONE yang belum diambil.
@@ -71,7 +72,7 @@ export function cekBayarSpk(spk: { status: StatusSpk; sisa: number }): KodeGalat
 }
 
 // Status bayar turunan, rumus yang sama dengan backend: lunas bila terbayar = total (termasuk SPK
-// bertotal 0, keputusan 0a-14), sebagian bila sudah ada pembayaran, selain itu belum bayar.
+// bertotal 0: tidak ada yang perlu dibayar), sebagian bila sudah ada pembayaran, selain itu belum bayar.
 export const statusBayar = (total: number, terbayar: number): StatusBayar => {
     if (terbayar === total) return 'paid'
     return terbayar > 0 ? 'partial' : 'unpaid'

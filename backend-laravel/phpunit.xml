@@ -5,8 +5,9 @@
     Unit: kelas murni tanpa Laravel, database, atau layanan luar.
     Feature: menyalakan Laravel dan mengirim permintaan lewat kernel HTTP untuk
     memeriksa urutan middleware dan bentuk galat, juga tanpa database (repository
-    sesi diganti tiruan di memori). Perilaku API lengkap tidak diuji di sini,
-    melainkan oleh tes kontrak (../tests/kontrak) terhadap backend yang menyala.
+    sesi diganti tiruan di memori). Perilaku API lengkap per rute (database,
+    stok, WhatsApp) tidak diuji di sini, karena butuh backend yang menyala dan
+    MySQL sungguhan; kontrak di ../spec adalah acuan perilakunya.
     Pengecualian: MigrasiMySqlTest menjalankan bengkel:migrate terhadap MySQL
     sungguhan, dan hanya jalan bila TEST_DATABASE_URL diisi (lihat README).
 -->

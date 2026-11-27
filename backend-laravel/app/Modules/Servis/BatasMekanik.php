@@ -15,7 +15,7 @@ use App\Support\Validation\JsonObject;
  * Batas mekanik di rute SPK (spec, "Peran dan sesi", "Batas mekanik"):
  * mekanik hanya melihat dan mengubah SPK yang ditugaskan kepadanya, dan di
  * PATCH hanya boleh mengirim diagnosis. Uang, stok, dan pembatalan tetap di
- * kasir (keputusan rancangan nomor 2), dan rute itu sudah ditolak lebih awal
+ * kasir (yang bertanggung jawab atas kas), dan rute itu sudah ditolak lebih awal
  * oleh middleware peran.
  *
  * Pemilik dan kasir tidak dibatasi apa pun di sini.
@@ -29,7 +29,8 @@ final class BatasMekanik
      * Rincian, PATCH, dan ubah status SPK: mekanik yang membuka SPK bukan
      * miliknya, termasuk SPK yang belum punya mekanik → 403 forbidden.
      * Dipanggil sesudah SPK ditemukan (404 lebih dulu) dan sebelum badan
-     * divalidasi (0a-6). Rute ubah status memanggilnya lagi sesudah baris SPK
+     * divalidasi, supaya mekanik yang membuka SPK orang lain selalu mendapat
+     * jawaban yang sama apa pun isi badannya. Rute ubah status memanggilnya lagi sesudah baris SPK
      * dikunci, karena mekaniknya bisa diganti kasir di antara keduanya.
      */
     public static function bolehBuka(SesiStaf $sesi, ?string $mechanicStaffId): void

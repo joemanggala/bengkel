@@ -61,7 +61,7 @@ final class StatusSpkTest extends TestCase
 
     public function test_waiting_parts_cannot_go_straight_to_done(): void
     {
-        // Keputusan 0a-4: kembali ke Dikerjakan dulu.
+        // Part datang: kembali ke Dikerjakan dulu, baru Selesai.
         $this->assertFalse(StatusSpk::MenungguPart->bolehKe(StatusSpk::Selesai));
     }
 
@@ -107,7 +107,7 @@ final class StatusSpkTest extends TestCase
             'uang muka' => [165_000, 50_000, StatusBayar::Sebagian],
             'kurang satu rupiah' => [165_000, 164_999, StatusBayar::Sebagian],
             'lunas' => [165_000, 165_000, StatusBayar::Lunas],
-            'total 0 dianggap lunas (0a-14)' => [0, 0, StatusBayar::Lunas],
+            'total 0 dianggap lunas' => [0, 0, StatusBayar::Lunas],
         ];
     }
 

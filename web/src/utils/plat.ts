@@ -18,7 +18,7 @@ export const kunciPlatMentah = (teks: string): string =>
         .replace(/[a-z]/g, (h) => h.toUpperCase())
 
 // Tampilan dari kunci: huruf depan, angka, huruf belakang (boleh kosong) dipisah satu spasi; kunci
-// yang tidak mengikuti pola itu ditampilkan apa adanya (keputusan Bagian 0a nomor 0a-12).
+// yang tidak mengikuti pola itu ditampilkan apa adanya, sama dengan bentuk yang dikirim backend.
 export const tampilanPlat = (kunci: string): string => {
     const cocok = /^([A-Z]+)([0-9]+)([A-Z]*)$/.exec(kunci)
     if (!cocok) return kunci

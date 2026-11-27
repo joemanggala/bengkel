@@ -34,7 +34,7 @@ function Baris({ label, children }: { label: string; children: React.ReactNode }
 
 // Pelanggan, kendaraan, dan data SPK. Pemilik dan kasir mengubah mekanik, keluhan, odometer, dan
 // estimasi; mekanik hanya mengisi diagnosis (spec: kunci lain dari mekanik ditolak 403). Semua
-// perubahan hanya selama SPK belum selesai (keputusan 0a-5).
+// perubahan hanya selama SPK belum selesai, supaya rekap tanggal yang sudah lewat tidak berubah.
 export default function KartuDataSpk({ spk, peran, onSpk }: Props) {
     const kasir = peran !== 'mechanic'
     const terbuka = spkTerbuka(spk.status)

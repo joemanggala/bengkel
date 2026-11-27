@@ -9,9 +9,10 @@ info:
   license:
     name: Proprietary
   description: |
-    Kontrak tunggal untuk semua backend yang mengimplementasikannya (Laravel
-    lebih dulu, Go dan NestJS menyusul; perilaku wajib identik), dipakai web
-    (website publik, panel pemilik, kasir, dan mekanik). Setiap respons
+    Kontrak tunggal untuk backend yang mengimplementasikannya, dipakai web
+    (website publik, panel pemilik, kasir, dan mekanik). Backend lain yang
+    mengikuti dokumen ini wajib berperilaku identik, sehingga web dan
+    database bisa dipakai tanpa perubahan. Setiap respons
     backend wajib sesuai dokumen ini; kode status atau field yang tidak
     tertulis di sini dianggap menyimpang. Pengiriman WhatsApp dan templat
     pesannya ada di [whatsapp.md](./whatsapp.md).
@@ -113,7 +114,8 @@ info:
       Aturan yang sama untuk `bookings.booking_token_hash`. Pengecualian:
       `work_orders.tracking_token` disimpan **apa adanya**, karena pesan
       WhatsApp "siap diambil" dan nota yang dikirim belakangan harus memuat
-      tautan lacaknya (sama dengan `qr_token` meja di kafe-resto).
+      tautan lacaknya, dan hash satu arah tidak bisa dikembalikan menjadi
+      token.
     - **Membaca header**: `Authorization` = nama skema `Bearer` (tidak peka
       huruf besar/kecil), tepat **satu** spasi U+0020, lalu token. Spasi di
       awal dan akhir nilai header diabaikan. Bentuk lain (skema lain, tanpa

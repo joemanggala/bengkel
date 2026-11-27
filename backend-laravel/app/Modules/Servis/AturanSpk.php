@@ -26,9 +26,11 @@ final class AturanSpk
      * POST /api/work-orders/{number}/status, bagian sesudah 422:
      *  1. mekanik menuju PICKED_UP → 403 forbidden;
      *  2. perpindahan tidak sah → 409 status_transition_invalid;
-     *  3. menuju DONE tanpa satu item pun → 409 work_order_empty (0a-4);
+     *  3. menuju DONE tanpa satu item pun → 409 work_order_empty (pesan
+     *     "siap diambil" bertotal Rp0 membingungkan pelanggan, dan item
+     *     terkunci sejak DONE);
      *  4. menuju PICKED_UP dengan sisa tagihan > 0 → 409 not_paid_off.
-     *     SPK bertotal 0 boleh langsung diambil (0a-14).
+     *     SPK bertotal 0 (mis. servis garansi) boleh langsung diambil.
      */
     public static function ubahStatus(StatusSpk $dari, StatusSpk $ke, Peran $peran, int $jumlahItem, int $sisaTagihan): void
     {
@@ -73,8 +75,8 @@ final class AturanSpk
     }
 
     /**
-     * Menghapus item tidak boleh membuat total di bawah yang sudah dibayar
-     * (0a-7): uang muka boleh sejak SPK dibuat, dan terbayar tidak pernah
+     * Menghapus item tidak boleh membuat total di bawah yang sudah dibayar:
+     * uang muka boleh sejak SPK dibuat, dan terbayar tidak pernah
      * melebihi total (CHECK work_orders_paid_rentang).
      */
     public static function hapusItem(int $total, int $subtotalItem, int $terbayar): void
@@ -85,7 +87,7 @@ final class AturanSpk
     }
 
     /**
-     * POST /api/work-orders/{number}/payments, bagian status (0a-8): SPK
+     * POST /api/work-orders/{number}/payments, bagian status: SPK
      * CANCELLED → work_order_cancelled; PICKED_UP → already_picked_up.
      * Batas jumlah (1 sampai sisa tagihan) dinilai pemanggil sesudahnya.
      */

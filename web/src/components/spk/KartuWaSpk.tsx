@@ -50,8 +50,8 @@ function StatusKirim({ wa }: { wa: StatusWa | null }) {
 
 // WhatsApp SPK dan tautan lacak (pemilik dan kasir). Status kirim terakhir tiap jenis pesan dari
 // `wa` di rincian SPK; pesan yang gagal bisa dikirim ulang, boleh ke nomor lain untuk sekali kirim.
-// Tautan lacak disimpan apa adanya oleh backend (keputusan 0a-1), jadi bisa disalin kapan saja;
-// membuat ulang mematikan tautan lama.
+// Tautan lacak disimpan apa adanya oleh backend (supaya bisa dikirim ulang di pesan WhatsApp), jadi
+// bisa disalin kapan saja; membuat ulang mematikan tautan lama.
 export default function KartuWaSpk({ spk, onSpk }: Props) {
     const { tampilkanToast } = useToast()
     const { sibuk, jalankan } = useAksi()

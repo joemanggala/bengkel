@@ -62,7 +62,7 @@ export default function RincianSpk({ awal, peran, outlet }: Props) {
                 deskripsi={
                     <span className="mt-1 flex flex-wrap gap-2">
                         <LencanaStatusSpk status={spk.status} />
-                        {/* SPK tanpa item bertotal 0 dianggap lunas oleh API (0a-14); lencananya
+                        {/* SPK tanpa item bertotal 0 dianggap lunas oleh API; lencananya
                             disembunyikan sampai ada item supaya tidak menyesatkan. */}
                         {kasir && adaItem && <LencanaBayar status={spk.paymentStatus} />}
                     </span>

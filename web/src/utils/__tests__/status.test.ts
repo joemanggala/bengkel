@@ -24,8 +24,7 @@ import {
     statusTujuanSpk,
 } from '../statusSpk'
 
-// Aturan dari spec ("Status SPK", "Status booking") dan keputusan Bagian 0a (0a-4, 0a-5, 0a-10,
-// 0a-14). Tabelnya ditulis ulang di sini dengan tangan supaya perubahan aturan yang tidak
+// Aturan dari spec ("Status SPK", "Status booking", "StatusBayar"). Tabelnya ditulis ulang di sini dengan tangan supaya perubahan aturan yang tidak
 // disengaja langsung terlihat.
 
 describe('transisi status SPK', () => {
@@ -41,7 +40,7 @@ describe('transisi status SPK', () => {
         for (const s of STATUS_SPK) expect([...TRANSISI_SPK[s]], s).toEqual(sah[s])
     })
 
-    it('menunggu part tidak bisa langsung selesai (0a-4)', () => {
+    it('menunggu part tidak bisa langsung selesai', () => {
         const spk = { status: 'WAITING_PARTS' as const, jumlahItem: 2, sisa: 0 }
         expect(cekTransisiSpk(spk, 'DONE')).toBe('status_transition_invalid')
     })
@@ -98,7 +97,7 @@ describe('pembatalan dan pembayaran SPK', () => {
         expect(cekBayarSpk({ status: 'QUEUED', sisa: 10 })).toBeNull()
     })
 
-    it('status bayar turunan sama dengan backend, termasuk total 0 = lunas (0a-14)', () => {
+    it('status bayar turunan sama dengan backend, termasuk total 0 = lunas', () => {
         expect(statusBayar(0, 0)).toBe('paid')
         expect(statusBayar(1000, 0)).toBe('unpaid')
         expect(statusBayar(1000, 400)).toBe('partial')

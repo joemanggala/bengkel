@@ -21,8 +21,8 @@ use App\Support\Text\Text;
  *    dipakai untuk indeks unik vehicles.plate_key dan pencarian;
  *  - tampilan = kelompok huruf depan, angka, dan huruf belakang dipisah satu
  *    spasi ("B 1234 XYZ"), atau kunci apa adanya bila tidak mengikuti pola
- *    itu (keputusan 0a-12), supaya ketiga backend menghasilkan bentuk yang
- *    sama persis tanpa menyimpan spasi ketikan.
+ *    itu (mis. plat khusus), supaya bentuknya selalu bisa
+ *    dihitung ulang dari kunci tanpa menyimpan spasi ketikan.
  *
  * Menghapus semua spasi dari tampilan selalu menghasilkan kunci (dijaga juga
  * oleh CHECK vehicles_plate_sesuai_kunci di database).

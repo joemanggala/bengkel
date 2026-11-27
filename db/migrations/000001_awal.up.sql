@@ -1,12 +1,12 @@
 -- Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
 -- Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
 
--- Skema awal aplikasi bengkel (MySQL 8.4, InnoDB, utf8mb4). Semua backend (Laravel lebih dulu,
--- Go dan NestJS menyusul) membaca skema yang sama persis dari berkas ini, jadi aturan penting
--- juga dijaga di sini lewat CHECK, UNIQUE, dan FOREIGN KEY: bila satu backend lupa
--- memvalidasi, database tetap menolak data yang tidak konsisten.
+-- Skema awal aplikasi bengkel (MySQL 8.4, InnoDB, utf8mb4). Setiap backend yang mengikuti
+-- kontrak API membaca skema yang sama persis dari berkas ini, jadi aturan penting juga dijaga di
+-- sini lewat CHECK, UNIQUE, dan FOREIGN KEY: bila satu backend lupa memvalidasi, database tetap
+-- menolak data yang tidak konsisten.
 --
--- Aturan bersama (sama dengan laundry dan kafe-resto):
+-- Aturan umum skema:
 -- * ID berupa CHAR(36) berisi UUID huruf kecil yang dibuat aplikasi. MySQL tidak punya
 --   RETURNING, jadi aplikasi membuat ID lebih dulu lalu memakainya lagi tanpa membaca ulang.
 -- * Kolom ID, hash, token, email, nomor HP, plat, nomor SPK/booking, SKU, dan kolom bernilai

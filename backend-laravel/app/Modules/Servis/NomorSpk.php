@@ -12,7 +12,7 @@ use InvalidArgumentException;
 /**
  * Nomor SPK: "S-" + nilai penghitung counters.work_order_number, minimal
  * empat digit (S-0001, S-9999, S-10000). Berurutan terus untuk outlet dan
- * tidak direset per hari (keputusan rancangan nomor 9).
+ * tidak direset per hari, supaya satu nomor selalu menunjuk satu SPK.
  */
 final class NomorSpk
 {

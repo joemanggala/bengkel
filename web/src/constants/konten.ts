@@ -1,7 +1,7 @@
 // Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
 // Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
 
-// Isi halaman depan website yang tidak berasal dari database (keputusan rancangan nomor 13):
+// Isi halaman depan website yang tidak berasal dari database:
 // langkah booking dan tanya jawab. Isinya jarang berubah, jadi cukup diedit di berkas ini lalu
 // build ulang web; tidak perlu CMS. Nama, tagline, alamat, nomor WhatsApp, jam buka, dan tautan
 // peta TIDAK ditulis di sini: semuanya diambil dari profil outlet (halaman Outlet di panel).

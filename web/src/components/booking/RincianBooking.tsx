@@ -41,7 +41,7 @@ function StatusWaBooking({ label, wa }: { label: string; wa: StatusWa | null }) 
 
 // Rincian satu booking dengan aksi staf: konfirmasi (WhatsApp ke pelanggan), tolak dengan alasan
 // (WhatsApp berisi alasannya), dan jadikan SPK saat pelanggan datang. Pesan booking yang gagal
-// terkirim tidak punya tombol kirim ulang (keputusan Bagian 0a): hubungi pelanggan sendiri.
+// terkirim tidak punya tombol kirim ulang (API tidak menyediakannya): hubungi pelanggan sendiri.
 export default function RincianBooking({ awal }: { awal: Booking }) {
     const router = useRouter()
     const { tampilkanToast } = useToast()

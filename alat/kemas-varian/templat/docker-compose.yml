@@ -1,0 +1,57 @@
+# Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+# Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+
+# Layanan lokal aplikasi bengkel. "docker compose up -d mysql" hanya
+# menyalakan MySQL; runner migration berada di profil "alat" sehingga hanya
+# jalan bila dipanggil dengan "docker compose run --rm migrate-dev up" (lihat
+# docs/menjalankan.md).
+#
+# Image dipatok dengan tag dan digest supaya semua orang memakai byte yang
+# sama, walau tag resmi sesekali dibangun ulang.
+name: bengkel
+
+services:
+  mysql:
+    image: mysql:8.4.10@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6
+    environment:
+      # Kredensial ini khusus database lokal di laptop, bukan kunci server.
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: bengkel
+      MYSQL_PASSWORD: bengkel
+    ports:
+      # Bukan 3306 (MySQL bawaan Laragon/XAMPP) supaya tidak bentrok dengan
+      # MySQL lain yang sudah menyala di laptop yang sama.
+      # Diikat ke 127.0.0.1: sandi root dan bengkel di sini sengaja sederhana (hanya untuk laptop),
+      # jadi MySQL tidak boleh terjangkau dari jaringan. Docker membuka port ke semua antarmuka
+      # bila awalan ini dihapus, dan firewall (mis. UFW) tidak menghalanginya. Untuk server, ikuti
+      # Panduan Upload ke VPS (docs/panduan).
+      - "127.0.0.1:3350:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Lewat TCP, karena selama inisialisasi image menyalakan server
+      # sementara tanpa jaringan; ping baru berhasil setelah server sungguhan
+      # (dan database dari db/init) siap.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ubengkel -pbengkel --silent"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  migrate-dev:
+    image: migrate/migrate:v4.20.1@sha256:76cc2074cb6642631f34a898ced71e6aeaa6b1a4d78c4daa743275a22e0c5be7
+    profiles: ["alat"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/migrations:ro
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      # multiStatements wajib: satu berkas migration berisi banyak pernyataan.
+      - -database=mysql://bengkel:bengkel@tcp(mysql:3306)/bengkel?multiStatements=true
+    command: ["up"]
+
+volumes:
+  mysqldata:

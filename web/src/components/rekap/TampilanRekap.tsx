@@ -47,7 +47,8 @@ const KOLOM_MEKANIK: KolomTabel<SelesaiPerMekanik>[] = [
 
 // Rekap harian (khusus pemilik) untuk satu tanggal WIB. Nilai, modal, laba, dan terlaris dari SPK
 // yang selesai pada tanggal itu; uang diterima dari pembayaran pada tanggal itu (termasuk uang
-// muka SPK yang belum selesai), sesuai keputusan Bagian 0a nomor 0a-9.
+// muka SPK yang belum selesai). SPK bengkel bisa berhari-hari dan itemnya baru final saat selesai,
+// jadi angka tanggal yang sudah lewat tidak berubah lagi.
 export default function TampilanRekap() {
     const [tanggal, setTanggal] = useState(() => tanggalWib())
     const [rekap, setRekap] = useState<RekapHarian | null>(null)

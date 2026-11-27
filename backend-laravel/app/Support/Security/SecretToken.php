@@ -15,7 +15,7 @@ namespace App\Support\Security;
  * Klien menerima token aslinya, sedangkan database hanya menyimpan hex
  * SHA-256-nya (sesi staf dan token booking), dihitung atas byte ASCII token
  * apa adanya, bukan hasil dekode base64-nya. Pengecualian: token lacak SPK
- * disimpan apa adanya (keputusan 0a-1), karena pesan "siap diambil" dan nota
+ * disimpan apa adanya, karena pesan "siap diambil" dan nota
  * yang dikirim belakangan harus bisa memuat tautannya. Bila isi tabel sesi
  * bocor, token aslinya tetap tidak bisa dipakai untuk masuk. SHA-256 tanpa garam cukup di sini (berbeda dengan
  * sandi), karena token berisi 256 bit acak sehingga tidak bisa ditebak lewat

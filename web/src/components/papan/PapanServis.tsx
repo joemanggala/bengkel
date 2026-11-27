@@ -30,7 +30,7 @@ import KartuSpk from './KartuSpk'
 
 type Props = { peran: PeranStaf; pesan?: React.ReactNode }
 
-// Papan memuat ulang berkala (keputusan 15). Batas 50 = limit terbesar API; papan bengkel satu
+// Papan memuat ulang berkala (polling, tanpa WebSocket). Batas 50 = limit terbesar API; papan bengkel satu
 // outlet jarang berisi lebih dari itu, dan yang terlama tampil lebih dulu.
 const JEDA_MS = 20_000
 const MAKS_PAPAN = 50

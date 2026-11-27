@@ -29,7 +29,7 @@ import { formatNomorHp, formatTanggal, formatWaktu } from '@/utils/format'
 import { tanggalWib } from '@/utils/kalender'
 import { UKURAN_BAWAAN, nomorAwal } from '@/utils/query'
 
-// Booking masuk dimuat ulang berkala (keputusan 15) supaya booking baru dari website terlihat
+// Booking masuk dimuat ulang berkala (polling, tanpa WebSocket) supaya booking baru dari website terlihat
 // tanpa menekan apa pun.
 const JEDA_MS = 30_000
 

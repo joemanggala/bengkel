@@ -67,7 +67,7 @@ final class ServisRepository implements ServisRepositoryInterface
             ->join('vehicles as v', 'v.vehicle_id', '=', 'w.vehicle_id')
             ->join('staff as p', 'p.staff_id', '=', 'w.created_by_staff_id')
             ->leftJoin('staff as m', 'm.staff_id', '=', 'w.mechanic_staff_id')
-            // Asal booking dibaca dari bookings.work_order_id (unik), bukan disimpan di SPK (0a-13).
+            // Asal booking dibaca dari bookings.work_order_id (unik), bukan disimpan di SPK, supaya tidak ada dua sumber yang bisa berselisih.
             ->leftJoin('bookings as bk', 'bk.work_order_id', '=', 'w.work_order_id')
             ->where('w.work_order_id', $workOrderId)
             ->first([

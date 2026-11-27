@@ -12,8 +12,7 @@ import {
     menuUntuk,
 } from '../menu'
 
-// Menu per peran persis seperti rancangan ("Halaman web" dan keputusan 1-2): mekanik hanya Papan
-// servis dan Rincian SPK; kasir tanpa menu khusus pemilik.
+// Menu per peran: mekanik hanya Papan servis dan Rincian SPK; kasir tanpa menu khusus pemilik.
 
 const label = (peran: Parameters<typeof menuUntuk>[0]) => menuUntuk(peran).map((m) => m.label)
 

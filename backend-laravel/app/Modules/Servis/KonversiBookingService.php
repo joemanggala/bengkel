@@ -25,8 +25,8 @@ use LogicException;
  *
  * Pelanggan dicari dari nomor HP booking dan kendaraan dari kunci platnya;
  * yang belum ada dibuat. Data yang sudah ada dipakai apa adanya dan tidak
- * pernah ditimpa isian form publik (keputusan 0a-10: jangan mengubah data
- * diam-diam). Plat yang terdaftar atas pelanggan lain ditolak supaya kasir
+ * pernah ditimpa isian form publik, karena siapa pun bisa mengisi form itu
+ * dan data pelanggan tidak boleh berubah diam-diam. Plat yang terdaftar atas pelanggan lain ditolak supaya kasir
  * memeriksanya dulu, mis. motor sudah dijual atau plat salah ketik.
  */
 final class KonversiBookingService

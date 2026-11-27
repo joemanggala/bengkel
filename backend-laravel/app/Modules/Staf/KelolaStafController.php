@@ -25,7 +25,7 @@ final class KelolaStafController
         return ApiResponse::data(array_map(fn (Staf $staf) => $staf->toArray(), $this->service->daftar()));
     }
 
-    /** GET /api/mechanics: mekanik aktif {staffId, name}, tanpa email (keputusan 0a-2). */
+    /** GET /api/mechanics: mekanik aktif {staffId, name}, tanpa email; kasir boleh memanggilnya, beda dengan daftar staf. */
     public function mechanics(): JsonResponse
     {
         return ApiResponse::data($this->service->mekanikAktif());

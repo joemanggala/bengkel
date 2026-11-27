@@ -8,15 +8,20 @@ bisa dibandingkan dengan tes.
 
 ## 1. Penyedia: bentuk API kirim Fonnte
 
-Antarmuka kirim meniru API kirim **Fonnte**, penyedia WhatsApp yang umum di Indonesia, sama
-dengan produk KodeCoding lain (laundry, kafe-resto). Pembeli yang memakai Fonnte cukup mengisi
+Antarmuka kirim meniru API kirim **Fonnte**, penyedia WhatsApp yang umum di Indonesia dan cukup
+didaftar dengan satu nomor WhatsApp biasa. Pembeli yang memakai Fonnte cukup mengisi
 `WA_API_URL` dan `WA_TOKEN`; penyedia lain dengan bentuk berbeda butuh penyesuaian kecil di satu
 tempat (klien WhatsApp backend).
 
 **Pengecekan ke dokumentasi resmi**: 27-11-2026, halaman
 <https://docs.fonnte.com/api-send-message/> ("Sending API Messages"). Halaman itu tidak
-mencantumkan tanggal pembaruan. Isinya sama dengan yang dicatat kafe-resto pada 04-11-2026. Yang
-terbaca di sana:
+mencantumkan tanggal pembaruan.
+
+<!-- kemas:abaikan-mulai -->
+Isinya sama dengan yang dicatat kafe-resto pada 04-11-2026.
+
+<!-- kemas:abaikan-selesai -->
+Yang terbaca di sana:
 
 - `POST https://api.fonnte.com/send`.
 - Token dikirim di header `Authorization` apa adanya; dokumentasinya menyebut "Authorization
@@ -367,15 +372,19 @@ http://localhost:3800/servis/Vt4mQ9xZ2kLp8RwN5sYb7HcJ3fGd6EaU1oIq0Te_-Xk
 
 ## 6. WhatsApp palsu untuk dev dan tes
 
-`tests/wa-palsu` (dibuat Bagian 0b) meniru `POST /send` di atas, menyimpan pesan di memori, dan
-menampilkannya di browser per nomor tujuan. Pesan tidak pernah sampai ke WhatsApp sungguhan.
-Port: 8890 untuk dev, 8891/8892/8893 untuk tes kontrak backend Go/Laravel/NestJS, 8814-8816
-untuk E2E. Perilaku dan endpoint kendalinya mengikuti WhatsApp palsu kafe-resto: penolakannya
-meniru Fonnte (balasan HTTP 200 dengan `"status": false` dan `reason` untuk token salah, badan
-bukan `multipart/form-data`, field selain tepat `target` dan `message`, atau `target` yang bukan
-satu nomor `628…`), sehingga backend yang hanya memeriksa status HTTP akan salah mencatat pesan
-gagal sebagai terkirim, dan tes menangkapnya. Mode gangguan `status-besar` membalas
-`{"Status": false, "reason": …}` tanpa `status` (bagian 2: gagal), dan jeda balasan bisa diatur
-sampai 15 detik, sehingga batas waktu 10 detik bisa diuji: pesan yang ditinggal pengirim sebelum
-jedanya habis tidak disimpan. Rincian dan cara menyalakannya ditulis Bagian 0b di
-`docs/menjalankan.md`.
+`tests/wa-palsu` meniru `POST /send` di atas, menyimpan pesan di memori, dan menampilkannya di
+browser per nomor tujuan. Pesan tidak pernah sampai ke WhatsApp sungguhan. Port bawaannya 8890.
+
+<!-- kemas:abaikan-mulai -->
+Port lain di repo pengembang: 8891/8892/8893 untuk tes kontrak backend Go/Laravel/NestJS,
+8814-8816 untuk E2E. Perilaku dan endpoint kendalinya mengikuti WhatsApp palsu kafe-resto.
+
+<!-- kemas:abaikan-selesai -->
+Penolakannya meniru Fonnte (balasan HTTP 200 dengan `"status": false` dan `reason` untuk token
+salah, badan bukan `multipart/form-data`, field selain tepat `target` dan `message`, atau `target`
+yang bukan satu nomor `628…`), sehingga backend yang hanya memeriksa status HTTP akan salah
+mencatat pesan gagal sebagai terkirim, dan kesalahan itu langsung terlihat saat mencoba di laptop.
+Mode gangguan `status-besar` membalas `{"Status": false, "reason": …}` tanpa `status` (bagian 2:
+gagal), dan jeda balasan bisa diatur sampai 15 detik, sehingga batas waktu 10 detik bisa diuji:
+pesan yang ditinggal pengirim sebelum jedanya habis tidak disimpan. Rincian dan cara
+menyalakannya ada di `docs/menjalankan.md`.

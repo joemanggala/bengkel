@@ -36,7 +36,7 @@ use LogicException;
  */
 final class BookingService
 {
-    /** Batas booking PENDING per nomor HP (keputusan rancangan nomor 4). */
+    /** Batas booking PENDING per nomor HP, untuk menahan banjir booking palsu dari form publik. */
     public const MAKS_MENUNGGU = 3;
 
     public function __construct(
@@ -51,7 +51,8 @@ final class BookingService
     /**
      * Rujukan serviceId di form booking: tidak ada, atau ada tetapi tidak
      * tampil di website → unknown_reference (jasa nonpublik diperlakukan
-     * seperti tidak ada, keputusan 0a-10); publik tetapi nonaktif →
+     * seperti tidak ada, karena dari sisi pelanggan jasa itu memang tidak
+     * pernah tampil); publik tetapi nonaktif →
      * inactive_reference.
      *
      * @return array{0: string|null, 1: string} nama jasa saat ini (untuk disalin) dan kode galat ("" bila sah)

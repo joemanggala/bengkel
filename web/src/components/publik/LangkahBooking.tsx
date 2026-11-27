@@ -3,9 +3,8 @@
 
 import { JUDUL_LANGKAH, LANGKAH_BOOKING } from '@/constants/konten'
 
-// Langkah booking di halaman depan. Isinya dari src/constants/konten.ts (keputusan rancangan
-// nomor 13), jadi pembeli cukup mengedit berkas itu. Berupa daftar bernomor supaya urutannya
-// juga terbaca pembaca layar.
+// Langkah booking di halaman depan. Isinya dari src/constants/konten.ts, jadi pembeli cukup
+// mengedit berkas itu. Berupa daftar bernomor supaya urutannya juga terbaca pembaca layar.
 export default function LangkahBooking() {
     return (
         <section aria-labelledby="judul-langkah">

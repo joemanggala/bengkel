@@ -75,7 +75,7 @@ final class ServisService
 
     /**
      * Rute yang boleh dipanggil mekanik (rincian, PATCH, status): 404 lebih
-     * dulu, lalu 403 bila SPK itu bukan miliknya (keputusan 0a-6).
+     * dulu, lalu 403 bila SPK itu bukan miliknya (lihat BatasMekanik).
      */
     public function bukaUntuk(SesiStaf $sesi, string $number): DasarSpk
     {
@@ -183,7 +183,8 @@ final class ServisService
     /**
      * Menulis SPK baru di transaksi pemanggil (dipakai juga konversi booking):
      * baris counters dikunci dan dinaikkan, SPK disimpan berstatus QUEUED
-     * dengan token lacak baru (disimpan apa adanya, keputusan 0a-1), lalu
+     * dengan token lacak baru (disimpan apa adanya supaya tautannya bisa
+     * dikirim ulang di pesan WhatsApp, lihat SecretToken), lalu
      * satu baris linimasa null → QUEUED.
      *
      * @return string work_order_id

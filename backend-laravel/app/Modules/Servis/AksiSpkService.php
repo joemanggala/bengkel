@@ -23,8 +23,8 @@ use App\Support\Validation\JsonObject;
 /**
  * Aksi kasir pada SPK: item jasa dan sparepart, pembayaran, kirim ulang
  * WhatsApp, dan membuat ulang tautan lacak. Mekanik sudah ditolak middleware
- * peran sebelum sampai ke sini (keputusan rancangan nomor 2: uang dan stok
- * hanya disentuh peran yang bertanggung jawab atas kas).
+ * peran sebelum sampai ke sini: uang dan stok hanya disentuh peran yang
+ * bertanggung jawab atas kas.
  */
 final class AksiSpkService
 {

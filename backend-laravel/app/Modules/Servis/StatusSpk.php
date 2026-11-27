@@ -16,7 +16,7 @@ namespace App\Modules\Servis;
  *
  * Status tidak sekadar maju satu langkah: di bengkel pekerjaan sering
  * berhenti menunggu part lalu dilanjutkan lagi, jadi Dikerjakan dan Menunggu
- * part boleh bolak-balik (keputusan rancangan nomor 6). Aturan yang sama dijaga CHECK work_order_status_logs_transisi_sah
+ * part boleh bolak-balik. Aturan yang sama dijaga CHECK work_order_status_logs_transisi_sah
  * di database.
  */
 enum StatusSpk: string
@@ -70,7 +70,7 @@ enum StatusSpk: string
      * SPK yang masih dikerjakan bengkel: item boleh ditambah atau dihapus dan
      * datanya boleh diubah (PATCH). Sejak DONE nilai SPK dan mekaniknya
      * tetap, jadi rekap hari yang sudah lewat tidak pernah berubah
-     * (keputusan 0a-5). Selain status ini → 409 work_order_locked.
+     * Selain status ini → 409 work_order_locked.
      */
     public function terbuka(): bool
     {

@@ -6,7 +6,7 @@ import { skemaStafRingkas } from './staf'
 import { skemaRupiah, skemaTanggal, skemaUuid } from './umum'
 
 // Spec: spec/components/schemas/rekap.yaml. Rekap satu tanggal WIB (khusus pemilik). Nilai,
-// modal, laba, dan terlaris dihitung dari SPK yang DONE pada tanggal itu (keputusan 0a-9).
+// modal, laba, dan terlaris dihitung dari SPK yang DONE pada tanggal itu, bukan tanggal dibuat.
 
 export const skemaJasaTerlaris = z.object({
     serviceId: skemaUuid,

@@ -8,7 +8,7 @@ import { PERAN_STAF, type PeranStaf } from '@/skema/staf'
 // middleware, penjaga di server (src/server/sesi.ts), dan tujuan ?ke= semuanya membaca daftar
 // ini, jadi menu yang tampil dan halaman yang boleh dibuka tidak mungkin berbeda.
 //
-// Tiga peran (rancangan, keputusan 1 dan 2):
+// Tiga peran:
 //   - pemilik : semua menu;
 //   - kasir   : Papan servis, SPK baru, Booking, Pelanggan (beserta Rincian SPK);
 //   - mekanik : hanya Papan servis (berisi SPK miliknya) dan Rincian SPK.
@@ -50,7 +50,7 @@ export const MENU_PANEL: readonly ItemMenu[] = [
     { label: 'Booking', href: '/admin/booking', ikon: 'kalender', peran: KASIR },
     { label: 'Pelanggan', href: '/admin/pelanggan', ikon: 'pelanggan', peran: KASIR },
     { label: 'Jasa', href: '/admin/jasa', ikon: 'kunci', peran: PEMILIK },
-    // Harga beli sparepart rahasia pemilik (keputusan 8), jadi kasir tidak membuka halaman ini.
+    // Harga beli sparepart rahasia pemilik (API tidak mengirimnya ke kasir), jadi kasir tidak membuka halaman ini.
     { label: 'Sparepart', href: '/admin/sparepart', ikon: 'gerigi', peran: PEMILIK },
     { label: 'Staf', href: '/admin/staf', ikon: 'staf', peran: PEMILIK },
     { label: 'Outlet', href: '/admin/outlet', ikon: 'outlet', peran: PEMILIK },

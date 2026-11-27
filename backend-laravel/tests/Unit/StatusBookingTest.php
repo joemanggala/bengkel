@@ -30,7 +30,7 @@ final class StatusBookingTest extends TestCase
             'jadikan SPK dari menunggu' => [StatusBooking::Menunggu, StatusBooking::JadiSpk],
             'jadikan SPK dari dikonfirmasi' => [StatusBooking::Dikonfirmasi, StatusBooking::JadiSpk],
             'tolak dari menunggu' => [StatusBooking::Menunggu, StatusBooking::Ditolak],
-            'tolak dari dikonfirmasi (0a-10)' => [StatusBooking::Dikonfirmasi, StatusBooking::Ditolak],
+            'tolak dari dikonfirmasi' => [StatusBooking::Dikonfirmasi, StatusBooking::Ditolak],
             'pelanggan membatalkan' => [StatusBooking::Menunggu, StatusBooking::Dibatalkan],
         ];
     }

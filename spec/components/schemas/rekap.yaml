@@ -78,7 +78,8 @@ RekapHarian:
     Modal part memakai harga beli **saat part ditambahkan ke SPK**. Item part
     dengan harga beli 0 dihitung bermodal 0 dan dihitung di
     `partItemsWithoutCost`, supaya web bisa menampilkan catatan "Harga beli
-    belum lengkap" seperti kafe-resto.
+    belum lengkap": laba kotor tanggal itu tampak lebih besar dari
+    sebenarnya sampai harga beli part dilengkapi.
   additionalProperties: false
   required:
     - date

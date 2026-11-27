@@ -14,7 +14,7 @@ use DateTimeImmutable;
  * Rekap satu tanggal WIB (skema RekapHarian).
  *
  * Nilai, modal, laba, dan terlaris dihitung dari SPK yang SELESAI (DONE) di
- * tanggal itu, bukan dari tanggal SPK dibuat (keputusan 0a-9): SPK bengkel
+ * tanggal itu, bukan dari tanggal SPK dibuat: SPK bengkel
  * bisa berhari-hari dan itemnya baru final saat DONE, jadi angka hari yang
  * sudah lewat tidak berubah lagi. "SPK masuk" tetap dari tanggal dibuat, dan
  * uang diterima dari tanggal pembayaran (uang muka dihitung di hari

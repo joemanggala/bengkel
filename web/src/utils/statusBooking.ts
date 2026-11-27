@@ -3,7 +3,7 @@
 
 import type { StatusBooking } from '@/skema/booking'
 
-// Aturan status booking dari spec ("Status booking") dan keputusan 0a-10:
+// Aturan status booking dari spec ("Status booking"):
 //
 //   PENDING -> CONFIRMED -> CONVERTED;  PENDING -> CONVERTED (pelanggan datang sebelum dikonfirmasi)
 //   PENDING, CONFIRMED -> REJECTED (staf, wajib alasan)

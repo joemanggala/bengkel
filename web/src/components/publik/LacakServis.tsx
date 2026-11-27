@@ -23,12 +23,12 @@ const KABAR: Record<SpkPublik['status'], string> = {
     CANCELLED: 'SPK ini dibatalkan bengkel.',
 }
 
-// Selama kendaraan masih di bengkel halaman memuat ulang berkala (polling, keputusan 15).
+// Selama kendaraan masih di bengkel halaman memuat ulang berkala (polling, tanpa WebSocket).
 const JEDA_MS = 30_000
 
 type Props = { token: string; awal: SpkPublik }
 
-// Halaman lacak servis, sekaligus nota online (keputusan 14): status, linimasa, kendaraan, rincian
+// Halaman lacak servis, sekaligus nota online (satu tautan WhatsApp untuk pelanggan, bukan dua): status, linimasa, kendaraan, rincian
 // item, total, terbayar, dan sisa. Tidak ada nama mekanik, diagnosis, maupun harga beli: API
 // publik memang tidak mengirimnya.
 export default function LacakServis({ token, awal }: Props) {
@@ -71,7 +71,7 @@ export default function LacakServis({ token, awal }: Props) {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                     <LencanaStatusSpk status={spk.status} />
-                    {/* SPK tanpa item bertotal 0 dianggap lunas oleh API (0a-14); lencana bayar
+                    {/* SPK tanpa item bertotal 0 dianggap lunas oleh API; lencana bayar
                         disembunyikan supaya tidak membingungkan. */}
                     {adaItem && <LencanaBayar status={spk.paymentStatus} />}
                 </div>

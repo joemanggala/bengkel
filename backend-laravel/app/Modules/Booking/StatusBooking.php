@@ -18,7 +18,7 @@ use App\Support\Http\ApiError;
  *
  * CONVERTED, REJECTED, dan CANCELLED adalah status akhir. Booking dari form
  * publik bisa diisi siapa saja, jadi semuanya mulai PENDING dan harus
- * diterima staf (keputusan rancangan nomor 4).
+ * diterima staf.
  */
 enum StatusBooking: string
 {
@@ -48,7 +48,8 @@ enum StatusBooking: string
      * Perpindahan yang tertulis di tabel "Status booking" spec. Ke status yang
      * sama, dari status akhir, dan CONFIRMED → CANCELLED (pelanggan hanya
      * bisa membatalkan selagi menunggu) tidak sah. REJECTED boleh dari
-     * PENDING maupun CONFIRMED (keputusan 0a-10).
+     * PENDING maupun CONFIRMED, karena bengkel bisa saja batal menerima
+     * booking yang sudah dikonfirmasi (mis. tutup mendadak).
      */
     public function bolehKe(self $tujuan): bool
     {

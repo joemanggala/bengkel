@@ -22,7 +22,8 @@ enum StatusBayar: string
 
     /**
      * Lunas bila yang dibayar sama dengan total, termasuk SPK bertotal 0
-     * (keputusan 0a-14: satu rumus untuk semua backend); sebagian bila sudah
+     * (tidak ada yang perlu dibayar, jadi SPK servis garansi bisa langsung
+     * diambil); sebagian bila sudah
      * ada pembayaran; selain itu belum. Terbayar tidak pernah melebihi total
      * (CHECK work_orders_paid_rentang).
      */

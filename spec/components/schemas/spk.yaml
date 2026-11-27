@@ -20,8 +20,8 @@ StatusSpk:
 StatusBayar:
   type: string
   description: |
-    Turunan dari `paidAmount` dan `total`, tidak disimpan (sama dengan
-    kafe-resto): `paid` bila `paidAmount` = `total` (termasuk SPK bertotal
+    Turunan dari `paidAmount` dan `total`, tidak disimpan supaya tidak
+    pernah berselisih dengan jumlah pembayarannya: `paid` bila `paidAmount` = `total` (termasuk SPK bertotal
     0), selain itu `partial` bila `paidAmount` > 0, selain itu `unpaid`.
   enum: [unpaid, partial, paid]
   x-label:
@@ -274,8 +274,8 @@ SpkDetail:
     `trackingToken` adalah token halaman lacak `/servis/{trackingToken}`.
     Token ini disimpan apa adanya (bukan hash) supaya pesan WhatsApp "siap
     diambil" dan nota yang dikirim kemudian tetap bisa memuat tautannya, dan
-    kasir bisa menyalinnya kapan saja (keputusan Bagian 0a, sama dengan
-    `qr_token` meja di kafe-resto). Membuat ulang
+    kasir bisa menyalinnya kapan saja; hash satu arah tidak bisa dikembalikan
+    menjadi token. Membuat ulang
     (`POST /api/work-orders/{number}/tracking-link`) mematikan token lama.
     Mekanik yang membuka SPK miliknya juga menerima `trackingToken` (rincian
     yang sama dengan kasir); token itu hanya membuka halaman lacak
