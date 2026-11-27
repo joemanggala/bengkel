@@ -86,8 +86,10 @@ cache yang ada terpakai.
   SPK bersamaan dan memastikan nomornya unik dan berurutan tanpa celah.
 - Status dan transisi persis rancangan, dengan kode galat `status_transition_invalid`,
   `not_paid_off`, `has_payments`, `work_order_locked`.
-- `POST /api/work-orders` dan `POST …/tracking-link` mengembalikan `trackingToken` sekali
-  (acak 32 byte, hanya hash disimpan); membuat ulang mematikan tautan lama (404).
+- ~~`trackingToken` dikembalikan sekali, hanya hash disimpan~~ **Diganti keputusan 0a-1
+  (diterima koordinator):** token lacak acak 32 byte disimpan apa adanya dan ada di setiap
+  rincian SPK staf; `POST …/tracking-link` membuat token baru dan mematikan tautan lama (404).
+  Ikuti `spec/`.
 - Item: `type` `SERVICE` | `PART`, jumlah 1–99, paling banyak 50 item per SPK (422), harga jasa
   boleh diisi (≥ 0), harga part selalu dari katalog. `costPrice` item tidak pernah ada di
   respons SPK untuk siapa pun (hanya dipakai rekap).

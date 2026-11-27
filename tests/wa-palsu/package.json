@@ -1,0 +1,22 @@
+{
+  "name": "bengkel-wa-palsu",
+  "version": "0.0.0",
+  "private": true,
+  "description": "WhatsApp tiruan (bentuk API kirim Fonnte) untuk tes kontrak dan dev aplikasi bengkel: semua pesan dari backend tertangkap di sini",
+  "type": "module",
+  "engines": {
+    "node": ">=20.17.0"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "6.4.3",
+    "vitest": "4.1.11"
+  }
+}
