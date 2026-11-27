@@ -33,7 +33,7 @@ kontrak API di `spec/`.
 
 ## Mencoba di laptop
 
-Prasyarat: MySQL 8 (atau Docker Desktop, lihat langkah 1), Node.js 20.17 ke atas{{prasyarat}}.
+Prasyarat: MySQL 8.0.16 ke atas (atau Docker Desktop, lihat langkah 1), Node.js 20.17 ke atas{{prasyarat}}.
 Setiap blok di bawah dijalankan di terminal sendiri, mulai dari folder paket ini.
 
 | Layanan | Alamat |
@@ -46,7 +46,7 @@ Setiap blok di bawah dijalankan di terminal sendiri, mulai dari folder paket ini
 **1. Database, cukup sekali.** Pilih salah satu cara.
 
 **Cara A, tanpa Docker (disarankan di Windows).** Pasang MySQL Community Server 8.4 LTS
-(atau 8.0 ke atas) seperti aplikasi biasa dan catat sandi root yang kamu buat saat memasang.
+(atau 8.0.16 ke atas) seperti aplikasi biasa dan catat sandi root yang kamu buat saat memasang.
 **XAMPP tidak bisa dipakai**: isinya MariaDB, bukan MySQL 8. Lalu jalankan `db/tanpa-docker.sql`
 sekali sebagai root untuk membuat database `bengkel` dan user `bengkel` / `bengkel`. Dari folder
 paket ini (Git Bash), lalu ketik sandi root saat diminta:
@@ -119,8 +119,8 @@ Mencoba booking: buka http://localhost:{{portWeb}} sebagai pelanggan, pilih jasa
 booking dengan nomor HP sembarang (mis. 0812-3456-7890). Sebagai kasir, buka menu **Booking**,
 konfirmasi booking itu, lalu **Jadikan SPK** dan tugaskan mekanik. Pesan WhatsApp-nya, termasuk
 tautan lacak servis, muncul di http://localhost:{{portWa}}. Dari HP di Wi-Fi yang sama, buka web
-lewat IP laptop (mis. http://192.168.1.6:{{portWeb}}) dan isi `PUBLIC_WEB_URL` backend dengan
-alamat itu supaya tautan di pesan WhatsApp juga terbuka di HP.
+lewat IP laptop (mis. http://192.168.1.6:{{portWeb}}) dan isi `PUBLIC_WEB_URL` backend dan web
+dengan alamat itu supaya tautan di pesan WhatsApp dan di nota juga terbuka di HP.
 
 Panduan lengkap ada di `{{folder}}/README.md` dan `docs/menjalankan.md`.
 
@@ -155,8 +155,9 @@ klien WhatsApp di `{{folder}}/`.
   lengkapnya di Panduan Upload ke VPS (`docs/panduan`).
 - **Backend di Nginx + PHP-FPM**, bukan server bawaan PHP (`{{mulai}}` hanya untuk dev, karena
   melayani satu permintaan sekaligus). Pengaturan pool yang wajib ada di `{{folder}}/README.md`.
-- **`PUBLIC_WEB_URL` backend** diisi alamat web produksi (`https://…`), karena tautan lacak dan
-  tautan booking di pesan WhatsApp dirangkai dari situ.
+- **`PUBLIC_WEB_URL` backend dan web** diisi alamat web produksi yang sama (`https://…`), karena
+  tautan lacak dan tautan booking di pesan WhatsApp, serta tautan lacak di nota cetak, dirangkai
+  dari situ.
 - **`API_URL` web** di server diisi alamat backend produksi, dan `COOKIE_SECURE=true` bila web
   dilayani lewat HTTPS (penjelasannya ada di `web/.env.example`).
 - **Identitas:** nama bengkel, tagline, alamat, nomor WhatsApp, jam buka, tautan peta, dan teks

@@ -9,6 +9,7 @@ import { POLA_NOMOR_SPK } from '@/skema/umum'
 import { profilOutlet } from '@/server/outlet'
 import { klienServer } from '@/server/pengangkut'
 import { arahkanBilaDitolak, wajibStaf } from '@/server/sesi'
+import { bacaAsalWebPublik } from '@/server/webPublik'
 
 type Props = { params: Promise<{ number: string }> }
 
@@ -18,7 +19,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 // Rincian SPK untuk semua peran. Mekanik yang membuka SPK bukan miliknya dibalas 403 oleh
-// backend dan diarahkan ke Papan servis dengan penjelasan.
+// backend dan diarahkan ke Papan servis dengan penjelasan. PUBLIC_WEB_URL dibaca di sini (server)
+// dan diteruskan ke komponen klien, supaya tautan lacak di nota dan tombol Salin sama dengan
+// tautan di pesan WhatsApp.
 export default async function HalamanRincianSpk({ params }: Props) {
     const { staf, token } = await wajibStaf()
     const { number } = await params
@@ -32,6 +35,11 @@ export default async function HalamanRincianSpk({ params }: Props) {
     if (!hasil.ok && hasil.status === 404) notFound()
     if (!hasil.ok) return <GalatMuat galat={hasil.galat} judul="SPK belum bisa dimuat" />
     return (
-        <RincianSpk awal={hasil.data} peran={staf.role} outlet={outlet.ok ? outlet.data : null} />
+        <RincianSpk
+            awal={hasil.data}
+            peran={staf.role}
+            outlet={outlet.ok ? outlet.data : null}
+            asalWeb={bacaAsalWebPublik()}
+        />
     )
 }

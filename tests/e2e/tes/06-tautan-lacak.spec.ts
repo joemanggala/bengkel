@@ -3,17 +3,52 @@
 
 // Tautan lacak dibuat ulang (mis. karena tersebar ke orang lain): tautan lama langsung tidak
 // berlaku dan menampilkan pesan, tautan baru bekerja, dan nota WhatsApp membawa tautan baru.
+// Tautan di kartu WhatsApp, tombol Salin, Buka, dan nota cetak sama persis dengan tautan di pesan
+// WhatsApp ({PUBLIC_WEB_URL}/servis/<token>), juga saat panel dibuka lewat alamat lain.
 
-import { type Page, expect, test } from '@playwright/test';
-import { OUTLET, PART, PELANGGAN, SESI_KASIR, bacaData, kartu, nilaiDl, rupiah, simpanData, tautanDariPesan, toast, tungguPesanWa } from './pembantu';
+import { type Locator, type Page, expect, test } from '@playwright/test';
+import {
+  ALAMAT,
+  KASIR,
+  OUTLET,
+  PART,
+  PELANGGAN,
+  SESI_KASIR,
+  bacaData,
+  kartu,
+  masuk,
+  nilaiDl,
+  rupiah,
+  simpanData,
+  tautanDariPesan,
+  toast,
+  tungguPesanWa,
+} from './pembantu';
 
 test.describe.configure({ mode: 'serial' });
 
 let kasir: Page;
 
 test.beforeAll(async ({ browser }) => {
-  kasir = await (await browser.newContext({ storageState: SESI_KASIR })).newPage();
+  const konteks = await browser.newContext({ storageState: SESI_KASIR });
+  await konteks.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: ALAMAT.web });
+  kasir = await konteks.newPage();
 });
+
+// Tautan yang tampil di kartu, yang disalin tombol Salin, yang dibuka tombol Buka, dan yang
+// tercetak di nota harus sama persis dengan `harapan` (tautan dari pesan WhatsApp).
+async function cekTautanSama(page: Page, harapan: string, salin: boolean): Promise<void> {
+  const wa: Locator = kartu(page, 'WhatsApp dan tautan lacak');
+  await expect(wa.locator('[data-tautan-lacak]')).toHaveText(harapan);
+  await expect(wa.getByRole('link', { name: 'Buka', exact: true })).toHaveAttribute('href', harapan);
+  await expect(page.locator('#area-cetak')).toContainText('Nota online:');
+  await expect(page.locator('#area-cetak p', { hasText: '/servis/' })).toHaveText(harapan);
+  if (salin) {
+    await wa.getByRole('button', { name: 'Salin', exact: true }).click();
+    await expect(toast(page)).toHaveText('Tautan lacak disalin.');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(harapan);
+  }
+}
 
 test.afterAll(async () => {
   await kasir.context().close();
@@ -62,4 +97,21 @@ test('nota WhatsApp yang dikirim sesudahnya membawa tautan baru', async () => {
   // Harga beli tidak pernah ada di nota.
   expect(isi).not.toContain(rupiah(PART.oli.beli));
   expect(tautanDariPesan(isi)).toBe(tautanLacak);
+  // Kartu, Salin, Buka, dan nota cetak memakai tautan yang persis sama dengan pesan ini.
+  await cekTautanSama(kasir, tautanDariPesan(isi), true);
+});
+
+test('panel yang dibuka lewat alamat lain tetap memakai PUBLIC_WEB_URL untuk tautan lacak', async ({ browser }) => {
+  // Web yang sama lewat 127.0.0.1: tanpa PUBLIC_WEB_URL di web, tautan di nota akan ikut alamat
+  // browser ini dan berbeda dengan tautan di pesan WhatsApp (localhost).
+  const { spkBooking, tautanLacak } = bacaData();
+  expect(ALAMAT.webLain).not.toBe(ALAMAT.web);
+  const lain = await (await browser.newContext({ baseURL: ALAMAT.webLain })).newPage();
+  await masuk(lain, KASIR);
+  await lain.goto(`/admin/spk/${spkBooking}`);
+  await expect(lain).toHaveURL(`${ALAMAT.webLain}/admin/spk/${spkBooking}`);
+  await cekTautanSama(lain, tautanLacak!, false);
+  expect(tautanLacak!.startsWith(`${ALAMAT.web}/servis/`)).toBe(true);
+  await expect(kartu(lain, 'WhatsApp dan tautan lacak')).not.toContainText(ALAMAT.webLain);
+  await lain.context().close();
 });

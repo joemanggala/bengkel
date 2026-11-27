@@ -423,6 +423,11 @@ function periksaKonsistensi(isi, varian, versi) {
     if (envWeb !== undefined && bacaEnv(envWeb).get('API_URL') !== `http://localhost:${varian.port}`) {
         galat.push(`web/.env.example: API_URL harus http://localhost:${varian.port}`)
     }
+    // Web menyusun tautan lacak di nota dan tombol Salin dari PUBLIC_WEB_URL miliknya sendiri; nilai
+    // yang berbeda dengan backend membuat tautan di nota tidak sama dengan tautan di pesan WhatsApp.
+    if (envWeb !== undefined && bacaEnv(envWeb).get('PUBLIC_WEB_URL') !== PUBLIC_WEB_URL_DEV) {
+        galat.push(`web/.env.example: PUBLIC_WEB_URL harus ${PUBLIC_WEB_URL_DEV}, sama dengan backend, supaya tautan di nota sama dengan tautan di pesan WhatsApp`)
+    }
     // Semua dokumen menyebut WhatsApp palsu di port 8890; bila kodenya mendengarkan di port lain, `npm start`
     // yang diikuti pembeli menyala di tempat yang salah dan pesan tidak pernah terlihat.
     const portMain = /WA_PALSU_PORT \?\? (\d+)/.exec(baca('tests/wa-palsu/src/main.ts') ?? '')?.[1]

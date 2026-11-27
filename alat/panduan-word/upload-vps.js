@@ -277,11 +277,13 @@ curl http://127.0.0.1:8802/api/health
 NODE_ENV=production
 NEXT_TELEMETRY_DISABLED=1
 API_URL=http://127.0.0.1:8802
+PUBLIC_WEB_URL=https://bengkel-kamu.example
 COOKIE_SECURE=true
 EOF
 sudo chown root:bengkel /etc/bengkel/web.env && sudo chmod 640 /etc/bengkel/web.env`),
         ...tabel(['Env', 'Isi'], [
             ['`API_URL`', 'Alamat backend **di server yang sama** (blok Nginx backend di bab 6). Wajib diisi di produksi; hanya dibaca server web.'],
+            ['`PUBLIC_WEB_URL`', 'Alamat website yang dibuka pelanggan, **sama persis dengan `PUBLIC_WEB_URL` di `/etc/bengkel/backend.env`**. Dipakai untuk tautan lacak di nota cetak dan tombol Salin di rincian SPK, supaya sama dengan tautan di pesan WhatsApp. Wajib diisi di produksi; bila kosong, kartu tautan lacak menampilkan galat dan nota tercetak tanpa tautan.'],
             ['`COOKIE_SECURE`', '`true`: cookie sesi staf hanya dikirim lewat HTTPS.'],
         ], [3, 9]),
         kode(`cd /opt/bengkel/app/web
@@ -332,7 +334,7 @@ curl -I http://bengkel-kamu.example/admin/masuk          # harapannya HTTP 200`)
             ['`Host`, `X-Forwarded-Host`, `X-Forwarded-Proto`', 'Web memeriksa bahwa permintaan berasal dari alamatnya sendiri (perlindungan CSRF) dan menentukan cookie aman dari protokol. Tanpa header ini login gagal di balik HTTPS.'],
             ['`bengkel_booking` (10 per menit per IP, lonjakan 10)', 'Membuat dan membatalkan booking. Di atas batas, Nginx membalas 429.'],
             ['`bengkel_publik` (120 per menit, lonjakan 60)', 'Halaman booking dan lacak servis beserta API publiknya. Halaman lacak memuat ulang sendiri setiap 30 detik, jadi angkanya longgar.'],
-            ['`bengkel_masuk` (20 per menit, lonjakan 10)', 'Halaman masuk dan pemasangan awal; membatasi tebakan sandi. Backend juga mengunci satu email 15 menit sesudah 10 kali gagal masuk, tetapi batas per alamat IP ini tetap perlu supaya penebak tidak bisa mencoba banyak email sekaligus.'],
+            ['`bengkel_masuk` (20 per menit, lonjakan 10)', 'Halaman masuk dan pemasangan awal; membatasi tebakan sandi. Backend juga mengunci satu email 15 menit sesudah 10 kali gagal masuk. Kunci itu dihitung **per email, bukan per alamat IP**, jadi orang yang tahu email pemilik bisa sengaja menguncinya 15 menit dengan sandi asal-asalan. Batas per alamat IP inilah pagar utamanya: penebak tidak bisa mencoba banyak email sekaligus, dan satu alamat tidak bisa terus-menerus mengunci akun orang lain.'],
             ['`access_log off` pada rute publik', 'Alamat status booking, pembatalan, dan lacak servis memuat token rahasia, jadi tidak boleh tercatat di log akses Nginx. Backend sendiri hanya mencatat pola rute, bukan tokennya. Permintaan yang ditolak 429 tetap dicatat di log galat Nginx beserta alamatnya; batasi siapa yang bisa membaca `/var/log/nginx`.'],
             ['`client_max_body_size 1m`', 'Batas badan permintaan yang sama dengan backend dan web.'],
         ], [5, 7]),
@@ -445,7 +447,7 @@ docker compose exec mysql sh -c 'mysql -ubengkel -p"$MYSQL_PASSWORD" bengkel -e 
             ['☐', '`SETUP_TOKEN` sudah dikosongkan dan PHP-FPM dimuat ulang (bab 9.2).'],
             ['☐', 'Pembatasan laju Nginx aktif: dari laptop, kirim `curl -X POST https://bengkel-kamu.example/bff/public/bookings` lebih dari 20 kali berturut-turut; balasan akhirnya 429.'],
             ['☐', 'Log akses Nginx tidak memuat alamat `/booking/…`, `/servis/…`, atau `/bff/public/…` (`sudo tail /var/log/nginx/access.log`).'],
-            ['☐', '`PUBLIC_WEB_URL` adalah alamat `https://` website, dan tautan di pesan WhatsApp terbuka dari HP lewat data seluler (bab 10).'],
+            ['☐', '`PUBLIC_WEB_URL` di `backend.env` dan `web.env` adalah alamat `https://` website yang sama, tautan di pesan WhatsApp terbuka dari HP lewat data seluler (bab 10), dan tautan di kartu WhatsApp rincian SPK sama dengan tautan di pesan.'],
             ['☐', 'WhatsApp sungguhan diuji: pesan SPK dibuat, siap diambil, dan nota masuk; konfirmasi booking juga.'],
             ['☐', 'Satu booking dari HP pelanggan berhasil dibuat, dikonfirmasi, dan dijadikan SPK.'],
             ['☐', 'Sandi pemilik kuat dan tersimpan di pengelola sandi.'],
@@ -463,10 +465,11 @@ docker compose exec mysql sh -c 'mysql -ubengkel -p"$MYSQL_PASSWORD" bengkel -e 
             ['`bengkel:periksa`: "database tidak bisa dihubungi atau ditolak (galat 1045)"', '1045 sandi salah, 2002 MySQL mati (`docker compose ps`), 1044 atau 1049 database atau hak akses salah. Pakai sandi hex tanpa simbol.'],
             ['Backend: "baru punya N dari 16 tabel"', 'Migration belum dijalankan: `sudo -u www-data php artisan bengkel:migrate`.'],
             ['Balasan JSON kadang diawali teks peringatan PHP, atau JSON rusak dinilai aneh', 'Baris pool FPM di bab 6.4 belum ada, atau PHP-FPM belum dinyalakan ulang.'],
-            ['Masuk ditolak: "Terlalu banyak percobaan masuk"', 'Email itu sudah 10 kali berturut-turut gagal masuk dan dikunci 15 menit oleh backend. Tunggu, lalu masuk dengan sandi yang benar. Bila terjadi tanpa sebab yang jelas, mungkin ada yang mencoba menebak sandi; periksa log Nginx.'],
+            ['Masuk ditolak: "Terlalu banyak percobaan masuk"', 'Email itu sudah 10 kali berturut-turut gagal masuk dan dikunci 15 menit oleh backend. Tunggu, lalu masuk dengan sandi yang benar. Kuncinya per email, jadi bila terjadi tanpa sebab yang jelas, mungkin ada yang menebak sandi atau sengaja mengunci email itu; periksa log Nginx dan pastikan batas `bengkel_masuk` (bab 8) aktif.'],
             ['Login berhasil tetapi langsung kembali ke halaman masuk', 'Cookie tidak tersimpan: aplikasi dibuka lewat `http://`, atau Nginx tidak meneruskan `X-Forwarded-Proto` dan `X-Forwarded-Host`. Periksa blok situs di bab 8.'],
             ['Pelanggan melihat "Terlalu banyak permintaan" (429)', 'Pembatasan laju Nginx terpicu. Bila terjadi pada pelanggan wajar (misalnya banyak orang di satu Wi-Fi), naikkan `rate` atau `burst` di `bengkel-batas.conf` dan situs, lalu `sudo nginx -t && sudo systemctl reload nginx`.'],
             ['Tautan di pesan WhatsApp mengarah ke alamat yang salah', '`PUBLIC_WEB_URL` di `/etc/bengkel/backend.env` salah. Perbaiki, muat ulang PHP-FPM, lalu kirim ulang pesan dari kartu WhatsApp di rincian SPK.'],
+            ['Tautan di nota cetak berbeda dengan tautan di pesan WhatsApp, atau kartu tautan lacak menampilkan galat `PUBLIC_WEB_URL`', '`PUBLIC_WEB_URL` di `/etc/bengkel/web.env` kosong atau berbeda dengan milik backend. Samakan, lalu `sudo systemctl restart bengkel-web`.'],
             ['Pesan WhatsApp tidak terkirim', 'Lihat tabel `wa_messages` (bab 10): `failure_reason` menyebut penyebabnya. Periksa `WA_TOKEN`, status perangkat di dashboard Fonnte, dan kuota.'],
             ['Sertifikat HTTPS gagal dibuat', 'Domain belum mengarah ke server (cek A record), atau port 80 tertutup. Jalankan ulang `sudo certbot --nginx -d bengkel-kamu.example` setelah diperbaiki.'],
             ['Build web gagal kehabisan memori', 'Tambah swap (bab 3.2) atau naikkan RAM server, lalu ulangi `npm run build`.'],

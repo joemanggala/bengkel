@@ -5,8 +5,9 @@
 // Sparepart): menunya tidak tampil, alamatnya mengalihkan ke Papan servis dengan penjelasan, dan
 // API-nya menolak 403 walau dipanggil langsung. Mekanik juga tidak bisa membuka halaman kasir.
 
+import { request as permintaanHttp } from 'node:http';
 import { type Page, expect, test } from '@playwright/test';
-import { SESI_KASIR, SESI_MEKANIK, SESI_PEMILIK, panggilBff, tanggalWib } from './pembantu';
+import { ALAMAT, SESI_KASIR, SESI_MEKANIK, SESI_PEMILIK, panggilBff, tanggalWib } from './pembantu';
 
 const HALAMAN_PEMILIK = [
   { menu: 'Rekap', alamat: '/admin/rekap' },
@@ -80,4 +81,43 @@ test('pemilik tetap bisa membuka semua halaman, dan tidak ada akun atau data lia
   await pemilik.goto('/admin/outlet');
   await expect(pemilik.getByLabel('Nama bengkel')).not.toHaveValue('Bengkel Diambil Alih');
   await pemilik.context().close();
+});
+
+test('BFF staf menolak tulis tanpa jejak asal dan badan yang bukan JSON', async ({ browser }) => {
+  const kasir = await (await browser.newContext({ storageState: SESI_KASIR })).newPage();
+  await kasir.goto('/admin/papan');
+  // Permintaan dari luar browser (cookie sesi ikut, tanpa Origin maupun Sec-Fetch-Site) ditolak.
+  const tanpaAsal = await kasir.request.post('/bff/staf/customers', { data: { name: 'Liar', phone: '081200000001' } });
+  expect(tanpaAsal.status()).toBe(403);
+  expect(await tanpaAsal.json()).toEqual({ error: { code: 'forbidden', message: 'Permintaan ditolak.' } });
+  // Asal sah tetapi badan bukan JSON: 415, bukan diganti diam-diam menjadi JSON.
+  const bukanJson = await kasir.request.post('/bff/staf/customers', {
+    headers: { Origin: ALAMAT.web, 'Content-Type': 'text/plain' },
+    data: JSON.stringify({ name: 'Liar', phone: '081200000001' }),
+  });
+  expect(bukanJson.status()).toBe(415);
+  expect((await bukanJson.json()).error.code).toBe('bad_request');
+  // fetch dari halaman panel sendiri (Origin dikirim browser) tetap jalan.
+  expect((await panggilBff(kasir, 'GET', '/staf/staff/me')).status).toBe(200);
+  await kasir.context().close();
+});
+
+// Path mentah lewat node:http: browser dan Playwright merapikan %2e%2e sebelum dikirim, padahal
+// alamat seperti ini datang apa adanya dari pemindai. Hasilnya harus halaman 404, bukan 500.
+function getMentah(path: string): Promise<number> {
+  const url = new URL(ALAMAT.web);
+  return new Promise((selesai, gagal) => {
+    const req = permintaanHttp({ host: url.hostname, port: url.port, path, method: 'GET' }, (res) => {
+      res.resume();
+      res.on('end', () => selesai(res.statusCode ?? 0));
+    });
+    req.on('error', gagal);
+    req.end();
+  });
+}
+
+test('alamat dengan %2e%2e dibalas halaman 404, bukan 500', async () => {
+  for (const path of ['/bff/public/%2e%2e/staff/me', '/bff/staf/%2e%2e/setup', '/bff/public/%2E%2E/%2e%2e/api/health', '/tidak-ada']) {
+    expect(await getMentah(path), path).toBe(404);
+  }
 });

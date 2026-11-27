@@ -135,7 +135,15 @@ final class MigrasiTest extends TestCase
     {
         yield 'MySQL 8.4' => ['8.4.10', true];
         yield 'MySQL 8.0' => ['8.0.36', true];
+        yield 'MySQL 8.0.16, CHECK pertama ditegakkan' => ['8.0.16', true];
+        yield 'MySQL 8.0.16 dengan akhiran' => ['8.0.16-log', true];
+        yield 'MySQL 8.4 dengan akhiran distro' => ['8.4.3-0ubuntu0.24.04.1', true];
         yield 'MySQL 9' => ['9.1.0', true];
+        yield 'MySQL 10 bukan MariaDB' => ['10.0.0', true];
+        yield 'MySQL 8.0.15, CHECK diabaikan' => ['8.0.15', false];
+        yield 'MySQL 8.0.15 dengan akhiran distro' => ['8.0.15-0ubuntu0.18.04.1', false];
+        yield 'MySQL 8.0.4 rc' => ['8.0.4-rc-log', false];
+        yield 'MySQL 8.0 tanpa nomor rilis' => ['8.0', false];
         yield 'MariaDB XAMPP' => ['10.4.32-MariaDB', false];
         yield 'MariaDB log' => ['11.4.2-MariaDB-log', false];
         yield 'MySQL 5.7' => ['5.7.44', false];
@@ -143,7 +151,7 @@ final class MigrasiTest extends TestCase
     }
 
     #[DataProvider('versiServer')]
-    public function test_only_mysql_8_and_newer_is_accepted(string $versi, bool $boleh): void
+    public function test_only_mysql_8_0_16_and_newer_is_accepted(string $versi, bool $boleh): void
     {
         $galat = null;
         try {
@@ -167,7 +175,10 @@ final class MigrasiTest extends TestCase
 
         $this->assertSame('server database ini MariaDB (10.4.32-MariaDB), bukan MySQL. Aplikasi ini butuh MySQL 8; '
             .'MySQL bawaan XAMPP sebenarnya MariaDB dan tidak bisa dipakai', $pesan('10.4.32-MariaDB'));
-        $this->assertSame('server database MySQL 5.7.44 terlalu lama; butuh MySQL 8.0 ke atas (disarankan 8.4)', $pesan('5.7.44'));
+        $this->assertSame('server database MySQL 5.7.44 terlalu lama; butuh MySQL 8.0.16 ke atas (disarankan 8.4), '
+            .'karena aturan CHECK di skema baru ditegakkan mulai MySQL 8.0.16', $pesan('5.7.44'));
+        $this->assertSame('server database MySQL 8.0.15 terlalu lama; butuh MySQL 8.0.16 ke atas (disarankan 8.4), '
+            .'karena aturan CHECK di skema baru ditegakkan mulai MySQL 8.0.16', $pesan('8.0.15'));
         $this->assertSame('versi server database "bukan-versi" tidak dikenali', $pesan('bukan-versi'));
     }
 

@@ -11,7 +11,7 @@ menjalankan dan memasangnya di server ada di `{{folder}}/README.md`, dan pengatu
 
 | Alat | Versi |
 |---|---|
-| MySQL | **8.0 ke atas** (disarankan 8.4 LTS) yang dipasang biasa (bagian 1, Cara A); atau Docker Desktop dengan Compose v2, yang menyalakan MySQL 8.4 di kontainer (Cara B) |
+| MySQL | **8.0.16 ke atas** (disarankan 8.4 LTS) yang dipasang biasa (bagian 1, Cara A); atau Docker Desktop dengan Compose v2, yang menyalakan MySQL 8.4 di kontainer (Cara B) |
 | Node.js | 20.17 ke atas (npm 10 ke atas), untuk web dan WhatsApp palsu |
 {{#laravel}}
 | PHP | 8.4 (ekstensi pdo_mysql, mbstring, openssl, curl; OPcache dianjurkan) |
@@ -34,7 +34,7 @@ menyala di laptop. `DATABASE_URL` di `{{folder}}/.env.example` memakai port kont
 
 ## 1. MySQL dan migration
 
-Aplikasi butuh MySQL 8 dengan database `bengkel`, lalu tabelnya dibuat oleh migration dari
+Aplikasi butuh MySQL 8.0.16 ke atas dengan database `bengkel`, lalu tabelnya dibuat oleh migration dari
 `db/migrations`. Pilih salah satu cara. **Cara A** memakai MySQL yang dipasang biasa, tanpa
 Docker; ini yang paling mudah di Windows. **Cara B** memakai Docker Desktop. Hasil keduanya sama,
 dan versi migration dicatat di tabel yang sama (`schema_migrations`), jadi satu database boleh
@@ -42,11 +42,13 @@ dimigrasi bergantian dengan kedua cara.
 
 ### Cara A: tanpa Docker
 
-1. Pasang **MySQL Community Server 8.0 ke atas** (disarankan 8.4 LTS, sama dengan kontainer)
+1. Pasang **MySQL Community Server 8.0.16 ke atas** (disarankan 8.4 LTS, sama dengan kontainer)
    seperti aplikasi biasa, dan catat sandi root yang kamu buat saat memasang. MySQL 8 yang
-   dibawa Laragon juga bisa. **MariaDB tidak bisa dipakai, termasuk "MySQL" bawaan XAMPP**:
-   skema memakai collation `utf8mb4_0900_ai_ci` dan `REGEXP_LIKE` di `CHECK` yang hanya ada di
-   MySQL 8. Perintah migration menolak MariaDB dengan pesan yang jelas.
+   dibawa Laragon juga bisa selama versinya 8.0.16 ke atas. **MariaDB tidak bisa dipakai,
+   termasuk "MySQL" bawaan XAMPP**: skema memakai collation `utf8mb4_0900_ai_ci` dan
+   `REGEXP_LIKE` di `CHECK` yang hanya ada di MySQL 8, dan `CHECK` baru ditegakkan mulai MySQL
+   8.0.16 (versi 8.0 yang lebih lama diam-diam mengabaikannya). Perintah migration menolak
+   MariaDB dan MySQL di bawah 8.0.16 dengan pesan yang jelas.
 2. Sebagai root, jalankan `db/tanpa-docker.sql` sekali. Berkas ini membuat database `bengkel`
    dan user `bengkel` / `bengkel`, sama dengan kontainer, dan aman dijalankan ulang. Dari folder
    paket, lalu ketik sandi root saat diminta:
@@ -223,13 +225,19 @@ internet.
   dan pemasangan awal). Batas tiga booking menunggu per nomor HP dan batas percobaan masuk per
   email hanya pengaman terakhir di backend, bukan pengganti rate limit. Contoh konfigurasi
   lengkap ada di Panduan Upload ke VPS (`docs/panduan`).
+- **Batas masuk dihitung per email.** Sepuluh percobaan gagal untuk satu email dalam 15 menit
+  mengunci email itu 15 menit, siapa pun yang mencoba, jadi orang yang tahu email pemilik bisa
+  sengaja menguncinya 15 menit. Pagar utamanya rate limit per IP di Nginx di depan
+  `/admin/masuk` (butir di atas).
 - **Backend di Nginx + PHP-FPM**, bukan server bawaan PHP. Pengaturan pool yang wajib
   (`enable_post_data_reading`, `display_errors`, log galat) ada di `{{folder}}/README.md`.
 - **Log akses Nginx** dimatikan atau disamarkan untuk lokasi `/api/public/`, `/booking/`, dan
   `/servis/`, karena path-nya memuat token booking dan token lacak pelanggan.
 - **`SETUP_TOKEN` dikosongkan** setelah pemilik pertama dibuat.
-- **`PUBLIC_WEB_URL`** diisi alamat web produksi, karena tautan lacak dan tautan booking di pesan
-  WhatsApp dirangkai dari situ.
+- **`PUBLIC_WEB_URL` backend dan web** diisi alamat web produksi yang sama, karena tautan lacak
+  dan tautan booking di pesan WhatsApp dirangkai backend dari situ, dan tautan lacak di nota cetak
+  serta tombol Salin di rincian SPK dirangkai web dari env dengan nama yang sama. Di produksi web
+  menolak `PUBLIC_WEB_URL` yang kosong: kartu tautan lacak menampilkan galat.
 - **`API_URL` web** diisi alamat backend produksi dan **`COOKIE_SECURE=true`** bila web dilayani
   lewat HTTPS.
 - **Cadangan database** berkala, dan pembersihan `staff_sessions` yang lewat `expires_at` serta
@@ -242,7 +250,8 @@ internet.
 | Backend berhenti saat dinyalakan dan pesannya menyebut nama env | env wajib kosong atau nilainya tidak sah, mis. `SETUP_TOKEN` kurang dari 16 byte atau masih nilai contoh dari dokumentasi (isi hasil `openssl rand -hex 16`). Perbaiki di `{{folder}}/.env`; isi env tidak pernah dicetak di pesan |
 | Backend tidak bisa terhubung ke database | MySQL belum menyala atau port di `DATABASE_URL` salah. Cara A: nyalakan layanan MySQL (Windows: aplikasi Services, layanan `MySQL84` atau sejenisnya) dan pastikan portnya sama, umumnya 3306. Cara B: `docker compose up -d mysql`, lalu tunggu `docker compose ps` menampilkan `(healthy)` |
 | Galat karena tabel tidak ada, atau database `bengkel` punya kurang dari 16 tabel | migration belum dijalankan sampai versi terbaru. Cara A: `{{migrasi}}` dari folder `{{folder}}`. Cara B: `docker compose run --rm migrate-dev up` |
-| `{{migrasi}}` menyebut "server database ini MariaDB" | MySQL bawaan XAMPP sebenarnya MariaDB dan tidak bisa dipakai. Pasang MySQL 8, atau pakai Cara B (Docker) |
+| `{{migrasi}}` menyebut "server database ini MariaDB" | MySQL bawaan XAMPP sebenarnya MariaDB dan tidak bisa dipakai. Pasang MySQL 8.0.16 ke atas, atau pakai Cara B (Docker) |
+| `{{migrasi}}` menyebut "terlalu lama; butuh MySQL 8.0.16 ke atas" | MySQL yang terpasang lebih tua dari 8.0.16 dan tidak menegakkan `CHECK`. Pasang MySQL 8.4 LTS, atau pakai Cara B (Docker) |
 | `{{migrasi}}` menyebut `Access denied` atau `Unknown database` | `db/tanpa-docker.sql` belum dijalankan sebagai root, atau user, sandi, atau nama database di `DATABASE_URL` berbeda dari isi berkas itu |
 | `source db/tanpa-docker.sql` gagal "Failed to open file" | jalankan perintahnya dari folder paket, atau tulis lokasi lengkap dengan garis miring `/`, bukan `\` |
 | `'mysql' is not recognized` atau `mysql: command not found` | `mysql` belum ada di PATH. Panggil lewat lokasi lengkapnya, mis. `"/c/Program Files/MySQL/MySQL Server 8.4/bin/mysql.exe"`, atau pakai MySQL Workbench |
@@ -252,5 +261,6 @@ internet.
 | Web tidak bisa memuat data atau menampilkan galat koneksi | backend belum menyala, atau `API_URL` di `web/.env.local` salah (di paket ini `http://localhost:{{port}}`) |
 | Pesan tidak muncul di <http://localhost:{{portWa}}> | backend tidak mengirim, `WA_API_URL` backend menunjuk ke tempat lain dari `http://localhost:{{portWa}}/send`, atau pesan dikirim ke nomor lain. Baca <http://localhost:{{portWa}}/__kendali/permintaan>: semua permintaan ke WhatsApp palsu tercatat di sana, termasuk yang ditolak |
 | WhatsApp palsu membalas `token invalid` | `WA_TOKEN` backend tidak sama dengan `WA_TOKEN` WhatsApp palsu; samakan keduanya |
-| Tautan lacak di pesan WhatsApp tidak terbuka di HP pelanggan | `PUBLIC_WEB_URL` backend masih `http://localhost:{{portWeb}}`; isi alamat web yang bisa dijangkau HP |
+| Tautan lacak di pesan WhatsApp tidak terbuka di HP pelanggan | `PUBLIC_WEB_URL` backend masih `http://localhost:{{portWeb}}`; isi alamat web yang bisa dijangkau HP, dan isi alamat yang sama di `PUBLIC_WEB_URL` web (`web/.env.local`) supaya tautan di nota cetak ikut sama |
+| Kartu tautan lacak di rincian SPK menampilkan galat `PUBLIC_WEB_URL` | `PUBLIC_WEB_URL` web kosong di produksi atau tidak diawali `http://`/`https://`; isi sama dengan milik backend, lalu nyalakan ulang web |
 | Kirim ulang pesan WhatsApp membalas 503 `wa_unavailable` | penyedia WhatsApp menolak atau tidak terjangkau: periksa `WA_API_URL` dan `WA_TOKEN`, lalu lihat baris terbaru tabel `wa_messages` (`status`, `failure_reason`) dan log pengiriman di dashboard penyedia |

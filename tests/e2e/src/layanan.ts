@@ -86,7 +86,10 @@ export class Tumpukan {
       const next = this.catat(
         nyalakan('web', process.execPath, [join('node_modules', 'next', 'dist', 'bin', 'next'), 'start', '-p', String(this.b.portWeb)], {
           cwd: web,
-          env: { API_URL: a.api, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1' },
+          // PUBLIC_WEB_URL web sama dengan milik backend, jadi tautan lacak di nota dan tombol
+          // Salin sama dengan tautan di pesan WhatsApp (06-tautan-lacak.spec.ts membandingkannya,
+          // juga saat panel dibuka lewat alamat lain).
+          env: { API_URL: a.api, PUBLIC_WEB_URL: a.web, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1' },
           berkasLog: join(FOLDER_LOG, `${this.b.kode}-web.log`),
         }),
       );

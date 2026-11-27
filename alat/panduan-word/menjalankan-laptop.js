@@ -27,7 +27,7 @@ const bab = [
         p('Browser tidak pernah berbicara langsung ke backend. Browser hanya berbicara ke web (Next.js), dan server web itulah yang memanggil backend. Itu sebabnya backend tidak butuh pengaturan CORS dan token login tidak pernah dipegang browser.'),
         h2('1.2 Yang perlu terpasang'),
         ...tabel(['Alat', 'Versi', 'Untuk apa'], [
-            ['**MySQL Community Server**', '8.0 ke atas (disarankan 8.4 LTS)', 'Database. **Bukan XAMPP**: "MySQL" di XAMPP sebenarnya MariaDB dan tidak bisa dipakai. MySQL 8 yang dibawa Laragon juga bisa.'],
+            ['**MySQL Community Server**', '8.0.16 ke atas (disarankan 8.4 LTS)', 'Database. **Bukan XAMPP**: "MySQL" di XAMPP sebenarnya MariaDB dan tidak bisa dipakai. MySQL 8 yang dibawa Laragon juga bisa selama versinya 8.0.16 ke atas: aturan `CHECK` di skema baru ditegakkan mulai versi itu.'],
             ['**Docker Desktop** (pilihan)', 'Compose v2 ke atas', 'Hanya bila kamu memilih menyalakan MySQL lewat Docker (bagian 2.1, Cara B) sebagai ganti memasang MySQL. Tidak wajib.'],
             ['**PHP**', '8.4 dengan ekstensi `pdo_mysql`, `mbstring`, `openssl`, `curl` (OPcache dianjurkan)', 'Backend Laravel. Laragon atau PHP untuk Windows dari windows.php.net bisa dipakai.'],
             ['**Composer**', '2', 'Memasang pustaka PHP backend.'],
@@ -112,9 +112,10 @@ const bab = [
         ...kotak('Backend langsung berhenti saat menyala?', ['Env yang kosong atau salah membuat backend berhenti dengan pesan "konfigurasi tidak sah: …" yang menyebut **nama** env-nya (tanpa mencetak isinya), misalnya `SETUP_TOKEN` yang terlalu pendek. Database yang belum dimigrasi juga disebut, misalnya "baru punya 0 dari 16 tabel". Baca pesannya, perbaiki `.env` atau jalankan migration, lalu nyalakan lagi.']),
         ...kotak('Jangan men-cache konfigurasi Laravel', ['Jangan menjalankan `php artisan config:cache` atau `php artisan optimize`. Sesudah konfigurasi di-cache, Laravel berhenti membaca `.env`, sehingga `DATABASE_URL` dan env lain mendadak kosong dan semua permintaan gagal. Bila terlanjur, jalankan `php artisan config:clear`.']),
         h2('2.5 Web'),
-        kode('cd web\nnpm ci\ncp .env.example .env.local     # API_URL menunjuk ke backend\nnpm run dev', 'Terminal 4, di http://localhost:3800'),
+        kode('cd web\nnpm ci\ncp .env.example .env.local     # API_URL menunjuk ke backend, PUBLIC_WEB_URL sama dengan backend\nnpm run dev', 'Terminal 4, di http://localhost:3800'),
         ...tabel(['Env web', 'Nilai di laptop', 'Artinya'], [
             ['`API_URL`', '`http://localhost:8802`', 'Alamat backend. Hanya dibaca server web, sengaja tanpa awalan `NEXT_PUBLIC_`, karena browser tidak pernah memanggil backend langsung. Saat pengembangan, bila kosong, dipakai nilai ini; di produksi wajib diisi.'],
+            ['`PUBLIC_WEB_URL`', '`http://localhost:3800`', 'Alamat website, **sama dengan `PUBLIC_WEB_URL` backend**. Dipakai untuk tautan lacak di nota cetak dan tombol Salin di rincian SPK, supaya sama persis dengan tautan di pesan WhatsApp. Saat pengembangan, bila kosong, dipakai alamat browser; di produksi wajib diisi.'],
             ['`COOKIE_SECURE`', 'kosong', 'Kosong berarti cookie sesi mengikuti protokol (http di laptop, https di server). Diisi `true` di produksi yang memakai HTTPS.'],
         ], [3, 3, 6]),
         p('Buka http://localhost:3800/admin. Karena belum ada akun, kamu dibawa ke halaman **Pemasangan awal**. Halaman depan http://localhost:3800 adalah website bengkel untuk pelanggan; dari bawah halaman itu staf masuk lewat tautan **Masuk ke panel**.'),
@@ -146,7 +147,7 @@ const bab = [
             'Cari alamat laptop di jaringan: di Windows jalankan `ipconfig` dan lihat "IPv4 Address" (misalnya `192.168.1.20`). Di macOS atau Linux, `ifconfig` atau `ip addr`.',
             'Izinkan koneksi masuk ke port 3800 bila Windows Firewall menanyakannya.',
             'Di HP, buka `http://192.168.1.20:3800` (ganti dengan alamat laptopmu) dan coba booking.',
-            'Supaya tautan di pesan WhatsApp juga bisa dibuka dari HP, ganti `PUBLIC_WEB_URL` di `.env` backend menjadi alamat yang sama (`http://192.168.1.20:3800`), lalu nyalakan ulang backend.',
+            'Supaya tautan di pesan WhatsApp dan di nota juga bisa dibuka dari HP, ganti `PUBLIC_WEB_URL` di `.env` backend dan di `web/.env.local` menjadi alamat yang sama (`http://192.168.1.20:3800`), lalu nyalakan ulang backend dan web.',
         ]),
         ...info('Bila halaman tidak terbuka di HP', ['Pastikan HP dan laptop di Wi-Fi yang sama (bukan jaringan "tamu" yang memisahkan perangkat), firewall mengizinkan port 3800, dan alamat yang dipakai adalah alamat IPv4 laptop. Backend tidak perlu dibuka ke jaringan: HP hanya berbicara ke web. Dalam mode `npm run dev`, bila halaman terbuka tetapi tampilannya tidak lengkap di HP, jalankan versi build: `npm run build` lalu `npm start` di folder `web`.']),
         h2('3.4 Mengirim WhatsApp sungguhan (opsional)'),
@@ -179,7 +180,8 @@ const bab = [
     [
         h1('5. Memecahkan Masalah'),
         ...tabel(['Gejala', 'Penyebab dan cara memperbaiki'], [
-            ['`bengkel:migrate`: "server database ini MariaDB"', 'Yang menyala adalah MySQL bawaan XAMPP (MariaDB). Pasang MySQL 8 (bagian 2.1, Cara A) dan pastikan `DATABASE_URL` menunjuk ke port MySQL 8 itu, atau pakai Cara B.'],
+            ['`bengkel:migrate`: "server database ini MariaDB"', 'Yang menyala adalah MySQL bawaan XAMPP (MariaDB). Pasang MySQL 8.0.16 ke atas (bagian 2.1, Cara A) dan pastikan `DATABASE_URL` menunjuk ke port MySQL itu, atau pakai Cara B.'],
+            ['`bengkel:migrate`: "terlalu lama; butuh MySQL 8.0.16 ke atas"', 'MySQL yang terpasang lebih tua dari 8.0.16 dan tidak menegakkan aturan `CHECK` di skema. Pasang MySQL 8.4 LTS, atau pakai Cara B.'],
             ['Backend: "database tidak bisa dihubungi atau ditolak (galat 1045)"', 'Kode galat menyebut sebabnya: 1045 sandi `DATABASE_URL` salah, 2002 MySQL mati atau port salah, 1044 atau 1049 database belum ada atau user tanpa akses (`db/tanpa-docker.sql` belum dijalankan sebagai root). Nilai untuk laptop: `mysql://bengkel:bengkel@127.0.0.1:3306/bengkel` (Cara A) atau `…:3350/bengkel` (Cara B).'],
             ['Backend: "database … baru punya N dari 16 tabel"', 'Migration belum dijalankan. Cara A: `php artisan bengkel:migrate` dari folder backend. Cara B: `docker compose run --rm migrate-dev up`.'],
             ['`source db/tanpa-docker.sql`: "Failed to open file"', 'Perintahnya tidak dijalankan dari folder paket, atau lokasinya ditulis dengan `\\`. Jalankan dari folder paket, atau tulis lokasi lengkap dengan garis miring `/`.'],
@@ -195,7 +197,7 @@ const bab = [
             ['Token pemasangan ditolak', 'Nilainya harus sama persis dengan `SETUP_TOKEN` di `.env` backend, dan backend perlu dinyalakan ulang setelah `.env` diubah. Bila `SETUP_TOKEN` kosong, pemasangan awal dimatikan.'],
             ['Masuk ditolak: "Terlalu banyak percobaan masuk"', 'Email itu sudah 10 kali berturut-turut gagal masuk, jadi dikunci 15 menit. Tunggu, lalu masuk dengan sandi yang benar. Hitungannya disimpan di tabel `login_attempts`, jadi tidak hilang saat backend dinyalakan ulang.'],
             ['Pesan WhatsApp tidak muncul di http://localhost:8890', 'WhatsApp palsu belum menyala, atau `WA_API_URL` backend tidak menunjuk ke `http://localhost:8890/send`. Nilai `WA_TOKEN` backend harus sama dengan milik WhatsApp palsu (nilai bawaan keduanya sudah sama). Pesan booking baru dikirim saat staf mengonfirmasi atau menolak, bukan saat pelanggan mengirim form.'],
-            ['Tautan di pesan WhatsApp tidak terbuka di HP', '`PUBLIC_WEB_URL` masih `http://localhost:3800`. Ganti dengan alamat laptop di jaringan (bagian 3.3).'],
+            ['Tautan di pesan WhatsApp tidak terbuka di HP', '`PUBLIC_WEB_URL` masih `http://localhost:3800`. Ganti dengan alamat laptop di jaringan, di backend dan di web (bagian 3.3).'],
             ['Laravel terasa lambat saat banyak yang membuka', 'Wajar: server bawaan PHP melayani satu permintaan sekali, dan pengiriman WhatsApp bisa menahan permintaan lain sampai 10 detik. Untuk beban sungguhan, pakai Nginx dan PHP-FPM.'],
             ['Perintah `cp` atau `openssl` tidak dikenal di Windows', 'Jalankan perintah di **Git Bash**, bukan Command Prompt atau PowerShell.'],
         ], [5, 7]),

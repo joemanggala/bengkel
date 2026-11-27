@@ -50,7 +50,7 @@ SETUP=$(openssl rand -hex 16)
 # node_modules ditautkan ke web/node_modules; salinan harus satu drive dengan web/.
 mkdir -p alat/panduan-word/.bangun && cp -r web alat/panduan-word/.bangun/web   # tanpa node_modules dan .next
 cd alat/panduan-word/.bangun/web && API_URL=http://127.0.0.1:8865 npx next build && \
-  API_URL=http://127.0.0.1:8865 npx next start --port 3865 --hostname 127.0.0.1
+  API_URL=http://127.0.0.1:8865 PUBLIC_WEB_URL=http://localhost:3865 npx next start --port 3865 --hostname 127.0.0.1
 
 # Memotret
 cd alat/panduan-word

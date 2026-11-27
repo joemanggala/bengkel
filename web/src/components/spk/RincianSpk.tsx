@@ -11,11 +11,11 @@ import Kartu from '@/components/ui/Kartu'
 import { LencanaBayar, LencanaStatusSpk } from '@/components/ui/Lencana'
 import { useSegarBerkala } from '@/components/ui/useSegarBerkala'
 import { PATH_BERANDA } from '@/constants/menu'
-import { alamatLacakServis } from '@/constants/publik'
 import { klienStaf } from '@/klien/peramban'
 import type { Outlet } from '@/skema/outlet'
 import type { SpkDetail } from '@/skema/spk'
 import type { PeranStaf } from '@/skema/staf'
+import { susunTautanLacak, type AsalWebPublik } from '@/utils/tautanLacak'
 import Linimasa from './Linimasa'
 import KartuBayarSpk from './KartuBayarSpk'
 import KartuDataSpk from './KartuDataSpk'
@@ -23,7 +23,12 @@ import KartuItemSpk from './KartuItemSpk'
 import KartuWaSpk from './KartuWaSpk'
 import PanelStatusSpk from './PanelStatusSpk'
 
-type Props = { awal: SpkDetail; peran: PeranStaf; outlet: Outlet | null }
+type Props = {
+    awal: SpkDetail
+    peran: PeranStaf
+    outlet: Outlet | null
+    asalWeb: AsalWebPublik
+}
 
 // SPK yang bisa diubah dari perangkat lain (mekanik mengubah status, kasir menambah item) dimuat
 // ulang berkala; yang sudah diambil atau batal tidak berubah lagi.
@@ -31,11 +36,13 @@ const JEDA_MS = 30_000
 
 // Rincian SPK. Pemilik dan kasir mendapat semua aksi (status, item, bayar, batal, WhatsApp,
 // tautan lacak, cetak nota); mekanik hanya status dan diagnosis. Batas yang sama dijaga backend.
-export default function RincianSpk({ awal, peran, outlet }: Props) {
+export default function RincianSpk({ awal, peran, outlet, asalWeb }: Props) {
     const kasir = peran !== 'mechanic'
     const [spk, setSpk] = useState(awal)
-    const [asal, setAsal] = useState('')
-    useEffect(() => setAsal(window.location.origin), [])
+    // Alamat browser hanya dipakai saat pengembangan tanpa PUBLIC_WEB_URL (src/utils/tautanLacak.ts),
+    // dan baru dibaca sesudah tampil karena server tidak tahu alamat yang dibuka staf.
+    const [asalPeramban, setAsalPeramban] = useState('')
+    useEffect(() => setAsalPeramban(window.location.origin), [])
 
     // Data dari aksi selalu yang terbaru; data dari polling hanya dipasang bila memang berubah,
     // supaya isian yang sedang diketik tidak ikut tersentuh.
@@ -52,7 +59,8 @@ export default function RincianSpk({ awal, peran, outlet }: Props) {
     )
 
     const adaItem = spk.items.length > 0
-    const tautanLacak = asal ? `${asal}${alamatLacakServis(spk.trackingToken)}` : undefined
+    // Satu tautan untuk nota cetak dan kartu WhatsApp, supaya keduanya tidak mungkin berbeda.
+    const tautanLacak = susunTautanLacak(asalWeb, spk.trackingToken, asalPeramban)
 
     return (
         <>
@@ -81,7 +89,7 @@ export default function RincianSpk({ awal, peran, outlet }: Props) {
                 </div>
                 <div className="space-y-5">
                     <KartuDataSpk spk={spk} peran={peran} onSpk={pasang} />
-                    {kasir && <KartuWaSpk spk={spk} onSpk={pasang} />}
+                    {kasir && <KartuWaSpk spk={spk} tautanLacak={tautanLacak} onSpk={pasang} />}
                     <Kartu judul="Linimasa">
                         <Linimasa baris={spk.timeline} />
                     </Kartu>
@@ -89,7 +97,11 @@ export default function RincianSpk({ awal, peran, outlet }: Props) {
             </div>
             {kasir && outlet && (
                 <AreaCetak>
-                    <NotaThermal spk={spk} outlet={outlet} tautanLacak={tautanLacak} />
+                    <NotaThermal
+                        spk={spk}
+                        outlet={outlet}
+                        tautanLacak={tautanLacak.tautan ?? undefined}
+                    />
                 </AreaCetak>
             )}
         </>

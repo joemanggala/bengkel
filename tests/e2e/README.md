@@ -54,12 +54,15 @@ terpisah.
 - **WhatsApp palsu:** `tests/wa-palsu` dengan token uji yang sama dengan backend; harness
   menunggu `/__kendali/ping` membalas sidik token yang benar sebelum lanjut.
 - **Web:** salinan `web/` di `.bangun/sumber/web-<backend>` dibuild dengan `next build` lalu
-  dijalankan `next start` dengan `API_URL` menunjuk backend E2E. Karena build dibuat di salinan,
+  dijalankan `next start` dengan `API_URL` menunjuk backend E2E dan `PUBLIC_WEB_URL` yang sama dengan
+  backend. Karena build dibuat di salinan,
   `.next` milik `npm run dev` di `web/` tidak pernah tersentuh dan `web/next.config.ts` tidak perlu
   diubah. Build dipakai ulang selama sumber `web/` tidak berubah (dicek dengan sidik isi berkas).
 
-`PUBLIC_WEB_URL` backend sama dengan alamat web E2E, jadi tautan lacak di pesan WhatsApp bisa
-dibuka langsung oleh tes. Port yang sudah dipakai proses lain membuat harness berhenti tanpa
+`PUBLIC_WEB_URL` backend dan web sama dengan alamat web E2E (`http://localhost:<port web>`), jadi
+tautan lacak di pesan WhatsApp bisa dibuka langsung oleh tes dan sama dengan tautan di nota. Web
+yang sama juga dibuka lewat `http://127.0.0.1:<port web>` untuk membuktikan tautan di panel memakai
+`PUBLIC_WEB_URL`, bukan alamat browser staf. Port yang sudah dipakai proses lain membuat harness berhenti tanpa
 mematikan proses itu.
 
 ## Skenario
@@ -73,8 +76,8 @@ Berjalan berurutan (satu worker). Nomor booking dan SPK bergantung pada urutan i
 | `spk` | `03-spk.spec.ts` | kasir menambah jasa yang disembunyikan dari website dengan harga khusus (jasa nonaktif tidak bisa dipilih) dan part (stok berkurang; kasir tidak menerima `costPrice`), part melebihi stok ditolak dengan pesan baku, SPK pelanggan datang langsung S-0002 untuk mekanik lain, mekanik hanya melihat SPK miliknya (halaman dialihkan, API 403), mekanik Dikerjakan → Menunggu part → Dikerjakan → Selesai, WhatsApp siap diambil tiba, pelanggan membuka tautan lacak dan melihat total, Diambil ditolak sebelum lunas (tombol terkunci dan API 409), bayar sebagian (tunai, kembalian) lalu lunas (QRIS), Diambil, linimasa, dan rekap pemilik cocok dengan hitungan ulang di tes (nilai, modal, laba kotor, per metode, terlaris) |
 | `penolakan` | `04-penolakan-dan-batal.spec.ts` | kasir menolak booking dengan alasan (B-0002), WhatsApp penolakan tiba, pelanggan melihat alasannya; pelanggan membatalkan booking sendiri (B-0003), tanpa WhatsApp, dan kasir tidak bisa mengonfirmasinya |
 | `batal-spk` | `05-batal-spk.spec.ts` | S-0002 diberi part sampai stok habis lalu dibatalkan dengan alasan → stok kembali, kartu stok mencatat "Dikembalikan dari SPK", SPK batal tidak bisa dibayar, pelanggan melihat alasannya di halaman lacak |
-| `tautan-lacak` | `06-tautan-lacak.spec.ts` | buat ulang tautan lacak → tautan lama menampilkan "Tautan lacak tidak berlaku", tautan baru bekerja, nota WhatsApp membawa tautan baru dan tanpa harga beli |
-| `akses` | `07-akses.spec.ts` | kasir dan mekanik tidak bisa membuka Rekap, Staf, Outlet, Jasa, Sparepart (menu tidak tampil, alamat dialihkan dengan penjelasan, API 403); mekanik juga tidak bisa membuka halaman kasir; tidak ada data liar yang tercipta |
+| `tautan-lacak` | `06-tautan-lacak.spec.ts` | buat ulang tautan lacak → tautan lama menampilkan "Tautan lacak tidak berlaku", tautan baru bekerja, nota WhatsApp membawa tautan baru dan tanpa harga beli; tautan di kartu, hasil tombol Salin (papan klip), tombol Buka, dan nota cetak sama persis dengan tautan di pesan WhatsApp, juga saat kasir membuka panel lewat `127.0.0.1` |
+| `akses` | `07-akses.spec.ts` | kasir dan mekanik tidak bisa membuka Rekap, Staf, Outlet, Jasa, Sparepart (menu tidak tampil, alamat dialihkan dengan penjelasan, API 403); mekanik juga tidak bisa membuka halaman kasir; tidak ada data liar yang tercipta; BFF staf menolak tulis tanpa `Origin` (403) dan badan bukan JSON (415); alamat `/bff/public/%2e%2e/…` dibalas 404, bukan 500 |
 
 Hitungan uang di tes (`03-spk.spec.ts`) ditulis ulang dari aturan di `docs/rancangan.md`, bukan
 diimpor dari kode produk, supaya salah hitung di produk tertangkap.

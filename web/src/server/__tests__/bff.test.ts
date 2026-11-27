@@ -8,6 +8,7 @@ import {
     asalSah,
     bacaBadanBerbatas,
     jalurStafBoleh,
+    jenisJson,
     rutePublikBoleh,
     teruskanPublik,
     teruskanStaf,
@@ -167,19 +168,129 @@ describe('pintu staf', () => {
         expect(fetchPalsu).not.toHaveBeenCalled()
     })
 
-    it('badan JSON diteruskan apa adanya dengan Content-Type JSON', async () => {
-        await teruskanStaf(
-            minta('/bff/staf/work-orders/S-0001/status', {
+    it('tulis tanpa Origin: hanya lolos bila browser menandai Sec-Fetch-Site same-origin', async () => {
+        const tulis = (metode: string, header: Record<string, string>) =>
+            teruskanStaf(
+                minta('/bff/staf/customers', {
+                    metode,
+                    cookie: TOKEN,
+                    badan: metode === 'DELETE' ? undefined : '{}',
+                    header: { 'content-type': 'application/json', ...header },
+                }),
+                ['customers'],
+            )
+        for (const metode of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+            const tanpaJejak = await tulis(metode, {})
+            expect(tanpaJejak.status, metode).toBe(403)
+            expect(await tanpaJejak.json()).toEqual({
+                error: { code: 'forbidden', message: 'Permintaan ditolak.' },
+            })
+            expect((await tulis(metode, { 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+            expect((await tulis(metode, { 'sec-fetch-site': 'same-site' })).status).toBe(403)
+            expect((await tulis(metode, { 'sec-fetch-site': 'none' })).status).toBe(403)
+        }
+        expect(fetchPalsu).not.toHaveBeenCalled()
+        expect((await tulis('POST', { 'sec-fetch-site': 'same-origin' })).status).toBe(200)
+        expect((await tulis('PATCH', { origin: 'http://bengkel.uji' })).status).toBe(200)
+        expect(fetchPalsu).toHaveBeenCalledTimes(2)
+    })
+
+    it('Origin di belakang proxy dicocokkan dengan X-Forwarded-Host', async () => {
+        const balasan = await teruskanStaf(
+            minta('/bff/staf/customers', {
                 metode: 'POST',
                 cookie: TOKEN,
-                badan: '{"status":"IN_PROGRESS"}',
-                header: { origin: 'http://bengkel.uji', 'content-type': 'text/plain' },
+                badan: '{}',
+                header: {
+                    host: 'localhost:3800',
+                    'x-forwarded-host': 'bengkelku.id',
+                    origin: 'https://bengkelku.id',
+                    'content-type': 'application/json',
+                },
             }),
-            ['work-orders', 'S-0001', 'status'],
+            ['customers'],
         )
+        expect(balasan.status).toBe(200)
+    })
+
+    it('GET tanpa Origin tetap lolos (navigasi dan fetch biasa)', async () => {
+        const balasan = await teruskanStaf(minta('/bff/staf/staff/me', { cookie: TOKEN }), [
+            'staff',
+            'me',
+        ])
+        expect(balasan.status).toBe(200)
+    })
+
+    it('badan JSON diteruskan apa adanya dengan Content-Type JSON', async () => {
+        for (const jenis of [
+            'application/json',
+            'application/json; charset=utf-8',
+            'Application/JSON;charset=UTF-8',
+        ]) {
+            const balasan = await teruskanStaf(
+                minta('/bff/staf/work-orders/S-0001/status', {
+                    metode: 'POST',
+                    cookie: TOKEN,
+                    badan: '{"status":"IN_PROGRESS"}',
+                    header: { origin: 'http://bengkel.uji', 'content-type': jenis },
+                }),
+                ['work-orders', 'S-0001', 'status'],
+            )
+            expect(balasan.status, jenis).toBe(200)
+            const { init } = panggilanTerakhir()
+            expect(new TextDecoder().decode(init.body as Uint8Array)).toBe(
+                '{"status":"IN_PROGRESS"}',
+            )
+            expect((init.headers as Record<string, string>)['Content-Type']).toBe(
+                'application/json',
+            )
+        }
+    })
+
+    it('badan bukan JSON ditolak 415 sebelum ke backend; badan kosong tidak diperiksa', async () => {
+        for (const jenis of [
+            'text/plain',
+            'application/x-www-form-urlencoded',
+            'multipart/form-data; boundary=x',
+            'application/jsonp',
+            'application/json-patch+json',
+            undefined,
+        ]) {
+            const balasan = await teruskanStaf(
+                minta('/bff/staf/customers', {
+                    metode: 'POST',
+                    cookie: TOKEN,
+                    badan: '{"name":"Budi"}',
+                    header: {
+                        origin: 'http://bengkel.uji',
+                        ...(jenis ? { 'content-type': jenis } : {}),
+                    },
+                }),
+                ['customers'],
+            )
+            expect(balasan.status, String(jenis)).toBe(415)
+            expect(await balasan.json()).toEqual({
+                error: {
+                    code: 'bad_request',
+                    message: 'Badan permintaan harus JSON dengan Content-Type: application/json.',
+                },
+            })
+        }
+        expect(fetchPalsu).not.toHaveBeenCalled()
+
+        // Rute tanpa badan (mis. konfirmasi booking) dikirim klien tanpa Content-Type.
+        const tanpaBadan = await teruskanStaf(
+            minta(`/bff/staf/bookings/${ID}/confirm`, {
+                metode: 'POST',
+                cookie: TOKEN,
+                header: { origin: 'http://bengkel.uji' },
+            }),
+            ['bookings', ID, 'confirm'],
+        )
+        expect(tanpaBadan.status).toBe(200)
         const { init } = panggilanTerakhir()
-        expect(new TextDecoder().decode(init.body as Uint8Array)).toBe('{"status":"IN_PROGRESS"}')
-        expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
+        expect(init.body).toBeUndefined()
+        expect(init.headers as Record<string, string>).not.toHaveProperty('Content-Type')
     })
 
     it('badan lebih dari 1 MiB ditolak 413 sebelum ke backend', async () => {
@@ -188,6 +299,7 @@ describe('pintu staf', () => {
                 metode: 'POST',
                 cookie: TOKEN,
                 badan: 'x'.repeat(BATAS_BADAN_BYTE + 1),
+                header: { origin: 'http://bengkel.uji', 'content-type': 'application/json' },
             }),
             ['customers'],
         )
@@ -250,6 +362,20 @@ describe('pintu publik', () => {
         )
         expect(balasan.status).toBe(403)
     })
+
+    it('booking tanpa Origin tetap diteruskan (tidak ada cookie yang dilindungi), badan wajib JSON', async () => {
+        const kirim = (jenis: string) =>
+            teruskanPublik(
+                minta('/bff/public/bookings', {
+                    metode: 'POST',
+                    badan: '{}',
+                    header: { 'content-type': jenis },
+                }),
+                ['bookings'],
+            )
+        expect((await kirim('application/json')).status).toBe(200)
+        expect((await kirim('text/plain')).status).toBe(415)
+    })
 })
 
 describe('pembantu', () => {
@@ -262,6 +388,23 @@ describe('pembantu', () => {
         expect(asalSah(dengan('http://bengkel.uji'))).toBe(true)
         expect(asalSah(dengan('https://jahat.id'))).toBe(false)
         expect(asalSah(dengan('bukan url'))).toBe(false)
+        // Pintu staf: tanpa Origin hanya lolos dengan Sec-Fetch-Site: same-origin.
+        expect(asalSah(dengan(), { wajib: true })).toBe(false)
+        expect(asalSah(dengan('http://bengkel.uji'), { wajib: true })).toBe(true)
+        const sameOrigin = new Request('http://bengkel.uji/x', {
+            headers: { host: 'bengkel.uji', 'sec-fetch-site': 'same-origin' },
+        })
+        expect(asalSah(sameOrigin, { wajib: true })).toBe(true)
+    })
+
+    it('Content-Type JSON', () => {
+        expect(jenisJson('application/json')).toBe(true)
+        expect(jenisJson('application/json; charset=utf-8')).toBe(true)
+        expect(jenisJson(' APPLICATION/JSON ')).toBe(true)
+        expect(jenisJson(null)).toBe(false)
+        expect(jenisJson('')).toBe(false)
+        expect(jenisJson('text/json')).toBe(false)
+        expect(jenisJson('application/problem+json')).toBe(false)
     })
 
     it('badan dibaca berbatas', async () => {

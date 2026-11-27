@@ -62,11 +62,14 @@ export function bacaKodeBackend(teks: string | undefined): KodeBackend {
 
 // Alamat yang dipakai harness dan browser. Backend dan WhatsApp palsu memakai 127.0.0.1
 // (backend Laravel hanya mendengarkan IPv4), web memakai localhost supaya cookie sesi diterima
-// browser walau tanpa HTTPS. PUBLIC_WEB_URL backend sama dengan alamat web, jadi tautan di pesan
-// WhatsApp bisa dibuka langsung oleh tes.
+// browser walau tanpa HTTPS. PUBLIC_WEB_URL backend dan web sama dengan alamat web, jadi tautan di
+// pesan WhatsApp bisa dibuka langsung oleh tes dan sama dengan tautan di nota. `webLain` adalah web
+// yang sama lewat 127.0.0.1, untuk membuktikan tautan di panel memakai PUBLIC_WEB_URL, bukan
+// alamat browser staf.
 export const alamat = (b: Backend) => ({
   api: `http://127.0.0.1:${b.portBackend}`,
   wa: `http://127.0.0.1:${b.portWa}`,
   web: `http://localhost:${b.portWeb}`,
+  webLain: `http://127.0.0.1:${b.portWeb}`,
   database: `mysql://bengkel:bengkel@127.0.0.1:3350/${b.database}`,
 });

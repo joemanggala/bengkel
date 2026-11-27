@@ -61,7 +61,7 @@ export function isiPaketSah(varian = LARAVEL, versi = '1.0.0', jenis = WEB) {
     m.set(`${varian.folder}/app/Kode.php`, `<?php\n\n${header()}\nclass Kode {}\n`)
     m.set('web/package.json', '{}\n')
     m.set('web/package-lock.json', '{}\n')
-    m.set('web/.env.example', `${header('#')}\nAPI_URL=http://localhost:${varian.port}\nCOOKIE_SECURE=\n`)
+    m.set('web/.env.example', `${header('#')}\nAPI_URL=http://localhost:${varian.port}\nPUBLIC_WEB_URL=${PUBLIC_WEB_URL_DEV}\nCOOKIE_SECURE=\n`)
     m.set('web/README.md', '# Web\n\nKontrak API ada di [spec](../spec/openapi.yaml).\n')
     m.set('web/src/app/page.tsx', `${header()}\nexport default function Halaman() { return null }\n`)
     m.set('spec/openapi.yaml', `${header('#')}\nopenapi: 3.1.0\nservers:\n  - url: http://localhost:${varian.port}\n    description: Backend (alamat dev bawaan)\n`)
@@ -163,7 +163,7 @@ export function buatRepoFixture(tambahan = {}) {
         'tests/wa-palsu/node_modules/x/index.js': 'x',
         'web/package.json': '{}\n',
         'web/package-lock.json': '{}\n',
-        'web/.env.example': `${header('#')}\nAPI_URL=http://localhost:8802\nCOOKIE_SECURE=\n`,
+        'web/.env.example': `${header('#')}\nAPI_URL=http://localhost:8802\nPUBLIC_WEB_URL=${PUBLIC_WEB_URL_DEV}\nCOOKIE_SECURE=\n`,
         'web/README.md': '# Web\n\nKontrak API ada di [spec](../spec/openapi.yaml).\n',
         'web/.env.local': 'API_URL=http://rahasia.example.com\n',
         'web/src/app/page.tsx': `${header()}\nexport default function Halaman() { return null }\n`,

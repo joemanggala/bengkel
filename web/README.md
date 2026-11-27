@@ -23,15 +23,16 @@ folder backend dan di [`../docs/menjalankan.md`](../docs/menjalankan.md).
 
 ```sh
 cd web
-cp .env.example .env.local      # sesuaikan API_URL dengan backend yang kamu jalankan
+cp .env.example .env.local      # sesuaikan API_URL dan PUBLIC_WEB_URL dengan backend yang kamu jalankan
 npm ci
 npm run dev                     # http://localhost:3800
 ```
 
-| Env             | Isi                                                                                                                                                                                                                                                                                                                   |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `API_URL`       | alamat backend, tanpa `/api` di belakangnya. Hanya dibaca server (sengaja tanpa awalan `NEXT_PUBLIC_`). Saat pengembangan, bila kosong dipakai alamat dev bawaan (`ALAMAT_API_BAWAAN` di `src/server/api.ts`); di produksi wajib diisi (kosong = galat yang menyebut `API_URL`, bukan diam-diam memanggil localhost). |
-| `COOKIE_SECURE` | opsional, `true` atau `false`; kosong = mengikuti protokol permintaan. Lihat "Cookie sesi".                                                                                                                                                                                                                           |
+| Env              | Isi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `API_URL`        | alamat backend, tanpa `/api` di belakangnya. Hanya dibaca server (sengaja tanpa awalan `NEXT_PUBLIC_`). Saat pengembangan, bila kosong dipakai alamat dev bawaan (`ALAMAT_API_BAWAAN` di `src/server/api.ts`); di produksi wajib diisi (kosong = galat yang menyebut `API_URL`, bukan diam-diam memanggil localhost).                                                                                                                                                                                                                                                                                                                                                                  |
+| `PUBLIC_WEB_URL` | alamat website yang dibuka pelanggan, **sama dengan `PUBLIC_WEB_URL` backend**, mis. `https://bengkelku.id`. Dipakai menyusun tautan lacak di nota cetak dan tombol Salin/Buka di rincian SPK, supaya sama persis dengan tautan di pesan WhatsApp (`{PUBLIC_WEB_URL}/servis/<token>`). Hanya dibaca server, saat berjalan. Aturannya sama dengan backend: diawali `http://` atau `https://`, tanpa spasi, garis miring akhir dibuang (nilai tidak sah = galat di kartu tautan). Saat pengembangan, bila kosong, dipakai alamat browser dengan catatan di layar; di produksi wajib diisi (kosong = galat yang menyebut `PUBLIC_WEB_URL`, bukan diam-diam memakai alamat browser kasir). |
+| `COOKIE_SECURE`  | opsional, `true` atau `false`; kosong = mengikuti protokol permintaan. Lihat "Cookie sesi".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 Pertama kali, buka `/admin`: bila backend belum punya akun staf, kamu dibawa ke `/admin/setup`
 (butuh `SETUP_TOKEN` dari env backend). Sesudah akun pemilik dibuat, kamu dibawa ke halaman
@@ -52,11 +53,11 @@ website. Akun kasir dan mekanik dibuat pemilik dari halaman **Staf**.
 ```sh
 npm ci
 npm run build
-API_URL=http://127.0.0.1:8802 npm start     # http://localhost:3800
+API_URL=http://127.0.0.1:8802 PUBLIC_WEB_URL=https://bengkelku.id npm start     # http://localhost:3800
 ```
 
-`API_URL` dibaca saat server berjalan, bukan saat build, jadi satu hasil build bisa dipakai untuk
-alamat backend mana pun. Di produksi, `next start` dijalankan sebagai layanan di belakang Nginx yang memegang HTTPS; langkah lengkapnya, termasuk contoh konfigurasi Nginx, ada di
+`API_URL` dan `PUBLIC_WEB_URL` dibaca saat server berjalan, bukan saat build, jadi satu hasil build
+bisa dipakai untuk alamat backend dan domain mana pun. Di produksi, `next start` dijalankan sebagai layanan di belakang Nginx yang memegang HTTPS; langkah lengkapnya, termasuk contoh konfigurasi Nginx, ada di
 Panduan Upload ke VPS di `docs/panduan`.
 
 Hal yang wajib di produksi:
@@ -67,6 +68,8 @@ Hal yang wajib di produksi:
   (`localhost:3800`), jadi tanpa header itu staf di belakang Nginx, atau tablet kasir yang membuka
   `http://192.168.x.x:3800`, dilempar ke `localhost`. Host yang bentuknya bukan nama host sah
   diabaikan (`src/server/alihkan.ts`).
+- **`PUBLIC_WEB_URL` diisi alamat `https://` website, sama dengan backend.** Tanpa itu kartu
+  tautan lacak di rincian SPK menampilkan galat dan nota tercetak tanpa tautan.
 - **Rate limit per alamat IP di Nginx** untuk halaman dan BFF booking publik, halaman lacak
   `/servis/*`, `/admin/masuk`, dan `/admin/setup`. Backend hanya melihat satu alamat IP (server
   web), jadi pagarnya harus di depan web.
@@ -139,8 +142,13 @@ BFF punya dua pintu yang sengaja dipisah: `/bff/staf` (butuh cookie sesi, untuk 
 2. **Panggilan data** dari komponen klien lewat `/bff/staf/<rute>`; server menambahkan
    `Authorization: Bearer <token>` dari cookie lalu meneruskan ke `{API_URL}/api/<rute>`. Hanya
    kelompok rute staf yang dikenal yang diteruskan; `setup`, `staff/login`, `staff/logout`, dan
-   rute publik ditolak di pintu ini. Penulisan dari situs lain ditolak (`Origin`), dan badan
-   dibatasi 1 MiB, sama dengan batas backend.
+   rute publik ditolak di pintu ini. Permintaan tulis (POST, PUT, PATCH, DELETE) wajib membawa
+   `Origin` yang cocok dengan alamat web, atau `Sec-Fetch-Site: same-origin` bila `Origin` tidak
+   ada; selain itu 403 `forbidden`. fetch dari halaman panel selalu mengirim `Origin`, jadi yang
+   tertolak hanya situs lain dan alat di luar browser yang membawa cookie sesi. Badan yang tidak
+   kosong wajib `Content-Type: application/json` (boleh dengan `; charset=…`), selain itu 415
+   (kode `bad_request`; berlaku juga di pintu publik), dan badan dibatasi 1 MiB, sama dengan batas
+   backend.
 3. **Website publik** memakai `/bff/public/<rute>`, yang **tidak membaca maupun meneruskan
    cookie** dan hanya mengenal lima rute (daftar putih metode + bentuk path: daftar jasa, kirim
    booking, status booking, batal booking, lacak servis). Pengunjung yang kebetulan juga masuk
@@ -245,7 +253,9 @@ Halaman `/admin/komponen` (tidak ada di menu) memuat semua komponen dengan data 
 
 Nota SPK dicetak dari rincian SPK lewat dialog cetak browser (komponen `NotaThermal`, gaya
 `.nota-thermal` di `globals.css`). Isinya mengikuti templat nota WhatsApp, jadi pelanggan menerima
-angka yang sama di kertas dan di ponsel; harga beli sparepart tidak pernah ada di nota. Nota
+angka yang sama di kertas dan di ponsel; harga beli sparepart tidak pernah ada di nota. Tautan
+"Nota online" disusun dari `PUBLIC_WEB_URL` (`src/utils/tautanLacak.ts`), sama dengan tautan di
+kartu WhatsApp, tombol Salin/Buka, dan pesan WhatsApp dari backend. Nota
 dirender dua kali (pratinjau di halaman dan portal `#area-cetak`); saat mencetak, semua anak
 `<body>` selain `#area-cetak` disembunyikan. Lebar 48 mm (bidang cetak printer 58 mm), hitam pekat
 tanpa abu-abu. Pilih kertas 58 mm di dialog cetak browser.
@@ -255,5 +265,6 @@ tanpa abu-abu. Pilih kertas 58 mm di dialog cetak browser.
 `npm test` menjalankan Vitest: pemformat (rupiah, waktu WIB, nomor HP, plat), aturan status SPK
 dan booking (tabel transisi ditulis ulang dengan tangan supaya perubahan yang tidak disengaja
 langsung terlihat), peta galat, aturan akses per peran, sesi dan cookie, pengalihan di belakang
-proxy, middleware, BFF (termasuk "pintu publik tidak membawa cookie"), klien API, skema terhadap
-kontrak, kontras tema, dan komponen.
+proxy, middleware, BFF (termasuk "pintu publik tidak membawa cookie", asal permintaan tulis, dan
+415 untuk badan bukan JSON), `PUBLIC_WEB_URL` dan tautan lacak, klien API, skema terhadap kontrak,
+kontras tema, dan komponen.

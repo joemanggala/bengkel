@@ -1,20 +1,23 @@
 # Menjalankan aplikasi bengkel secara lokal
 
-Panduan ini mencakup fondasi yang dipakai bersama semua backend: MySQL, migration, pemilik
-pertama, dan lint kontrak API. Perintah ditulis untuk Git Bash di Windows; di macOS/Linux sama
+Panduan ini mencakup fondasi yang dipakai bersama semua backend (MySQL, migration, pemilik
+pertama, WhatsApp palsu, lint dan tes kontrak API), serta cara menyalakan backend Laravel dan web
+untuk pengembangan. Perintah ditulis untuk Git Bash di Windows; di macOS/Linux sama
 persis. Jalankan dari folder project (mis. `D:\KODE_PRODUK\bengkel`) kecuali disebut lain.
 
-> **Status:** MySQL, migration, dan lint kontrak (Bagian 0a), WhatsApp palsu dan harness tes
-> kontrak (Bagian 0b) sudah bisa dijalankan. Backend Laravel (Bagian 1) dan web (Bagian 2)
-> menyusul; sebelum ada backend, `npm test` di `tests/kontrak` berhenti dengan pesan "Backend
-> tidak bisa dihubungi di …". Pembagian bagian ada di `docs/rancangan.md`.
+> **Status (0.1.0):** rancangan, fondasi (MySQL, migration, lint kontrak), WhatsApp palsu dan
+> tes kontrak, backend Laravel (lolos seluruh tes kontrak, juga di Nginx + php-cgi), web, tes E2E,
+> pengemas paket, dan empat panduan Word selesai. Backend Go dan NestJS menyusul. Pembagian
+> bagian ada di `docs/rancangan.md`.
 
 ## Prasyarat
 
 | Alat | Versi |
 |---|---|
 | Docker Desktop | Compose v2 ke atas |
-| Node.js | 20.17 ke atas (npm 10 ke atas), untuk lint kontrak dan tes |
+| MySQL tanpa Docker (opsional) | 8.0.16 ke atas (disarankan 8.4); `CHECK` di skema baru ditegakkan mulai 8.0.16. MariaDB tidak bisa dipakai |
+| Node.js | 20.17 ke atas (npm 10 ke atas), untuk web, WhatsApp palsu, lint kontrak, dan tes |
+| PHP | 8.4 dengan Composer 2, untuk backend Laravel (lihat `backend-laravel/README.md`) |
 
 ## Port lokal
 
@@ -63,7 +66,7 @@ docker compose run --rm migrate-dev version     # versi migration saat ini (seka
 docker compose run --rm migrate-uji down -all   # menghapus semua tabel (database uji saja)
 ```
 
-Tanpa Docker (MySQL 8 yang dipasang biasa), jalankan `db/tanpa-docker.sql` sekali sebagai root,
+Tanpa Docker (MySQL 8.0.16 ke atas yang dipasang biasa), jalankan `db/tanpa-docker.sql` sekali sebagai root,
 arahkan `DATABASE_URL` backend ke MySQL itu, lalu pakai perintah migration bawaan backend (dibuat
 Bagian 1, mis. `php artisan bengkel:migrate`). Perintah itu membaca `db/migrations` yang sama dan
 mencatat versi di `schema_migrations` persis seperti golang-migrate, jadi kedua cara boleh
@@ -159,7 +162,43 @@ Tidak ada kode OTP di produk ini, jadi `/__kendali/pesan` tidak punya kolom kode
 yang meniru Fonnte (HTTP 200 dengan `"status": false`) sengaja membuat backend yang hanya
 memeriksa kode HTTP salah mencatat pesan gagal sebagai terkirim; tes kontrak menangkapnya.
 
-## 4. Lint kontrak API
+## 4. Backend Laravel
+
+Rinciannya (arsitektur, env, menguji, produksi) ada di
+[`backend-laravel/README.md`](../backend-laravel/README.md). Untuk pengembangan, sesudah MySQL dan
+migration `migrate-dev` (bagian 1):
+
+```sh
+cd backend-laravel
+composer install
+cp .env.example .env               # lalu isi SETUP_TOKEN (minimal 16 byte) untuk pemilik pertama
+php artisan bengkel:serve          # http://localhost:8802 (atau: composer serve)
+```
+
+`.env.example` sudah menunjuk ke database `bengkel` di port 3350, WhatsApp palsu dev
+(`WA_API_URL=http://localhost:8890/send`, token yang sama), dan `PUBLIC_WEB_URL=http://localhost:3800`.
+`bengkel:serve` memeriksa env dan database lebih dulu dan menolak menyala dengan pesan yang
+menyebut nama env yang kosong atau salah. Server bawaan PHP ini melayani satu permintaan
+sekaligus; tes serentak dan produksi memakai Nginx + PHP-FPM (README backend).
+
+## 5. Web
+
+Rinciannya (BFF, sesi, peran, cetak nota, produksi) ada di [`web/README.md`](../web/README.md).
+Backend menyala lebih dulu.
+
+```sh
+cd web
+npm ci
+cp .env.example .env.local      # API_URL=http://localhost:8802, PUBLIC_WEB_URL=http://localhost:3800
+npm run dev                     # http://localhost:3800
+```
+
+`PUBLIC_WEB_URL` web wajib sama dengan milik backend: backend memakainya untuk tautan di pesan
+WhatsApp, web untuk tautan lacak di nota cetak dan tombol Salin di rincian SPK. Buka
+<http://localhost:3800/admin>: selama belum ada akun staf, web membuka halaman pemasangan awal
+(isi `SETUP_TOKEN` backend). Pesan WhatsApp dev terlihat di <http://localhost:8890> (bagian 3).
+
+## 6. Lint kontrak API
 
 Kontrak API ada di `spec/openapi.yaml` (dipecah ke `spec/paths/` dan `spec/components/`) dan
 harus lolos lint dengan 0 galat dan 0 peringatan. Contoh respons di spec ikut diperiksa terhadap
@@ -176,7 +215,7 @@ Versi redocly dipatok sama dengan produk lain supaya cache npm terpakai. Galat Y
 sering: nilai `description:` satu baris yang memuat `: ` (titik dua + spasi), mis.
 `Urutan: 401 → 404`. Tulis sebagai blok (`description: |`) atau beri tanda kutip.
 
-## 5. Tes kontrak
+## 7. Tes kontrak
 
 Satu suite Vitest untuk ketiga backend; yang berbeda hanya alamat backend, database uji, dan
 port WhatsApp palsunya.
@@ -283,7 +322,7 @@ SETUP_TOKEN= BASE_URL=http://localhost:8882 npx vitest run tes/setup.test.ts
 Pada jalan biasa (token diisi), tes setup-mati dilewati, dan sebaliknya. Backend dinyatakan
 lulus bila suite hijau dengan token diisi **dan** berkas setup hijau dengan token kosong.
 
-## 6. Hal kontrak yang mudah terlewat
+## 8. Hal kontrak yang mudah terlewat
 
 Yang sama dengan produk KodeCoding lain (sudah teruji di tiga backend di sana):
 

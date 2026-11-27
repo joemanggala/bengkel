@@ -3,16 +3,16 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import DialogKonfirmasi from '@/components/ui/DialogKonfirmasi'
 import Field, { atributField } from '@/components/ui/Field'
 import Input from '@/components/ui/Input'
 import Kartu from '@/components/ui/Kartu'
+import KotakPesan from '@/components/ui/KotakPesan'
 import { Lencana } from '@/components/ui/Lencana'
 import { useToast } from '@/components/ui/Toast'
 import Tombol from '@/components/ui/Tombol'
 import { useAksi } from '@/components/ui/useAksi'
-import { alamatLacakServis } from '@/constants/publik'
 import { klienStaf } from '@/klien/peramban'
 import {
     JENIS_PESAN_WA_SPK,
@@ -22,9 +22,10 @@ import {
     type StatusWa,
 } from '@/skema/spk'
 import { formatWaktu } from '@/utils/format'
+import type { TautanLacak } from '@/utils/tautanLacak'
 import { periksaNomorHp } from '@/utils/validasi'
 
-type Props = { spk: SpkDetail; onSpk: (spk: SpkDetail) => void }
+type Props = { spk: SpkDetail; tautanLacak: TautanLacak; onSpk: (spk: SpkDetail) => void }
 
 const KUNCI: Record<JenisPesanWaSpk, keyof SpkDetail['wa']> = {
     work_order_created: 'workOrderCreated',
@@ -51,17 +52,15 @@ function StatusKirim({ wa }: { wa: StatusWa | null }) {
 // WhatsApp SPK dan tautan lacak (pemilik dan kasir). Status kirim terakhir tiap jenis pesan dari
 // `wa` di rincian SPK; pesan yang gagal bisa dikirim ulang, boleh ke nomor lain untuk sekali kirim.
 // Tautan lacak disimpan apa adanya oleh backend (supaya bisa dikirim ulang di pesan WhatsApp), jadi
-// bisa disalin kapan saja; membuat ulang mematikan tautan lama.
-export default function KartuWaSpk({ spk, onSpk }: Props) {
+// bisa disalin kapan saja; membuat ulang mematikan tautan lama. Tautannya disusun RincianSpk dari
+// PUBLIC_WEB_URL (src/utils/tautanLacak.ts), jadi sama dengan tautan di pesan WhatsApp dan di nota.
+export default function KartuWaSpk({ spk, tautanLacak, onSpk }: Props) {
     const { tampilkanToast } = useToast()
     const { sibuk, jalankan } = useAksi()
     const [nomorLain, setNomorLain] = useState('')
     const [galatNomor, setGalatNomor] = useState<string | null>(null)
     const [buatUlang, setBuatUlang] = useState(false)
-    // Alamat situs dibaca sesudah tampil di browser (server tidak tahu domain yang dibuka staf).
-    const [asal, setAsal] = useState('')
-    useEffect(() => setAsal(window.location.origin), [])
-    const tautan = `${asal}${alamatLacakServis(spk.trackingToken)}`
+    const { tautan, catatan, galat } = tautanLacak
 
     const kirim = async (jenis: JenisPesanWaSpk) => {
         const phone = nomorLain.trim() === '' ? null : nomorLain
@@ -75,6 +74,7 @@ export default function KartuWaSpk({ spk, onSpk }: Props) {
     }
 
     const salin = async () => {
+        if (!tautan) return
         try {
             await navigator.clipboard.writeText(tautan)
             tampilkanToast('Tautan lacak disalin.')
@@ -135,21 +135,35 @@ export default function KartuWaSpk({ spk, onSpk }: Props) {
             )}
             <div className="mt-5 border-t border-garis pt-4">
                 <p className="text-sm font-semibold text-redup">Tautan lacak pelanggan</p>
-                <p className="mt-1 break-all rounded-lg bg-latar px-3 py-2 font-mono text-[13px]">
-                    {tautan}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                    <Tombol varian="kecil" onClick={() => void salin()}>
-                        Salin
-                    </Tombol>
-                    <a
-                        href={tautan}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center rounded-lg px-3.5 text-[15px] font-semibold text-utama-tua underline-offset-4 hover:underline"
+                {galat ? (
+                    <div className="mt-2">
+                        <KotakPesan jenis="galat">{galat}</KotakPesan>
+                    </div>
+                ) : (
+                    <p
+                        className="mt-1 min-h-9 break-all rounded-lg bg-latar px-3 py-2 font-mono text-[13px]"
+                        data-tautan-lacak
                     >
-                        Buka
-                    </a>
+                        {tautan}
+                    </p>
+                )}
+                {catatan && <p className="mt-1.5 text-sm text-redup">{catatan}</p>}
+                <div className="mt-3 flex flex-wrap gap-2">
+                    {tautan && (
+                        <>
+                            <Tombol varian="kecil" onClick={() => void salin()}>
+                                Salin
+                            </Tombol>
+                            <a
+                                href={tautan}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex min-h-11 items-center rounded-lg px-3.5 text-[15px] font-semibold text-utama-tua underline-offset-4 hover:underline"
+                            >
+                                Buka
+                            </a>
+                        </>
+                    )}
                     <Tombol varian="kecil" onClick={() => setBuatUlang(true)}>
                         Buat ulang
                     </Tombol>

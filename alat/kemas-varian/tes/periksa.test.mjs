@@ -497,6 +497,17 @@ const KONSISTENSI = [
         (m) => gantiTeks(m, 'web/.env.example', 'localhost:8802', 'localhost:8803'),
         [/^web\/\.env\.example: API_URL harus http:\/\/localhost:8802$/, /^web\/\.env\.example:\d+: merujuk port backend NestJS \(8803\)/],
     ],
+    [
+        // Tautan lacak di nota disusun web dari PUBLIC_WEB_URL miliknya; harus sama dengan backend.
+        'PUBLIC_WEB_URL web beda dengan backend',
+        (m) => gantiTeks(m, 'web/.env.example', 'PUBLIC_WEB_URL=http://localhost:3800', 'PUBLIC_WEB_URL=http://localhost:3000'),
+        [/^web\/\.env\.example: PUBLIC_WEB_URL harus http:\/\/localhost:3800, sama dengan backend/],
+    ],
+    [
+        'PUBLIC_WEB_URL web tidak ada',
+        (m) => gantiTeks(m, 'web/.env.example', 'PUBLIC_WEB_URL=http://localhost:3800\n', ''),
+        [/^web\/\.env\.example: PUBLIC_WEB_URL harus http:\/\/localhost:3800/],
+    ],
 ]
 for (const [nama, ubah, pola] of KONSISTENSI) {
     test(`paket yang tidak saling cocok ditolak: ${nama}`, async () => {

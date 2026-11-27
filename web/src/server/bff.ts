@@ -80,17 +80,32 @@ const GALAT_TERLALU_BESAR: GalatApi = {
 
 const GALAT_RUTE: GalatApi = { code: 'not_found', message: 'Rute tidak ada.' }
 
+const GALAT_ASAL: GalatApi = { code: 'forbidden', message: 'Permintaan ditolak.' }
+
+// 415 tidak punya kode galat sendiri di spec; bad_request dipakai supaya klien tetap mengenal
+// amplopnya. Pesan ini hanya terlihat oleh pemanggil yang tidak memakai klien web.
+const GALAT_BUKAN_JSON: GalatApi = {
+    code: 'bad_request',
+    message: 'Badan permintaan harus JSON dengan Content-Type: application/json.',
+}
+
 const balasGalat = (status: number, galat: GalatApi): NextResponse =>
     NextResponse.json({ error: galat }, { status, headers: { 'Cache-Control': 'no-store' } })
 
 // Server action dilindungi Next.js dari permintaan lintas situs; route handler tidak, jadi asal
 // permintaan diperiksa sendiri. Cookie SameSite=Lax sudah menahan POST dari situs lain, dan
-// badan JSON memaksa preflight CORS; pemeriksaan ini lapisan ketiga. Untuk pintu publik tidak
-// ada cookie yang perlu dilindungi, tetapi pemeriksaan yang sama mencegah halaman situs lain
-// memakai browser pengunjung untuk menembak rute booking.
-export const asalSah = (req: Request): boolean => {
+// badan JSON memaksa preflight CORS; pemeriksaan ini lapisan ketiga.
+//
+// Pintu staf (`wajib: true`) menolak permintaan tulis yang tidak bisa dibuktikan berasal dari
+// halaman web ini sendiri: Origin wajib ada dan cocok, atau bila Origin tidak dikirim, browser
+// wajib menandainya `Sec-Fetch-Site: same-origin`. fetch() dari halaman panel selalu mengirim
+// Origin untuk POST/PUT/PATCH/DELETE, jadi panel tidak terpengaruh; yang tertolak adalah alat atau
+// halaman lain yang membawa cookie sesi tanpa jejak asal. Pintu publik tidak punya cookie yang
+// perlu dilindungi, jadi Origin yang kosong diterima; Origin situs lain tetap ditolak supaya halaman
+// situs lain tidak bisa memakai browser pengunjung untuk menembak rute booking.
+export const asalSah = (req: Request, { wajib = false }: { wajib?: boolean } = {}): boolean => {
     const asal = req.headers.get('origin')
-    if (!asal) return true
+    if (!asal) return !wajib || req.headers.get('sec-fetch-site') === 'same-origin'
     const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host')
     try {
         return new URL(asal).host === host
@@ -98,6 +113,13 @@ export const asalSah = (req: Request): boolean => {
         return false
     }
 }
+
+const METODE_TULIS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+
+// Content-Type JSON, boleh dengan parameter (mis. "application/json; charset=utf-8"), tidak peka
+// huruf besar-kecil.
+export const jenisJson = (jenis: string | null): boolean =>
+    jenis !== null && jenis.split(';')[0].trim().toLowerCase() === 'application/json'
 
 const segmenAman = (jalur: readonly string[]): boolean =>
     jalur.length > 0 && jalur.every((segmen) => POLA_SEGMEN.test(segmen))
@@ -169,8 +191,15 @@ async function teruskanKeApi(
         const terbaca = await bacaBadanBerbatas(req, BATAS_BADAN_BYTE)
         if (terbaca === null) return balasGalat(413, GALAT_TERLALU_BESAR)
         badan = terbaca
-        // Spec mewajibkan Content-Type: application/json untuk permintaan berbadan.
-        if (badan.byteLength > 0) headers['Content-Type'] = 'application/json'
+        // Spec mewajibkan Content-Type: application/json untuk permintaan berbadan. Jenis lain
+        // ditolak di sini, bukan diganti diam-diam menjadi JSON: badan form atau teks dari luar
+        // web tidak boleh sampai ke backend seolah-olah JSON.
+        if (badan.byteLength > 0) {
+            if (!jenisJson(req.headers.get('content-type'))) {
+                return balasGalat(415, GALAT_BUKAN_JSON)
+            }
+            headers['Content-Type'] = 'application/json'
+        }
     }
 
     let balasan: Response
@@ -205,8 +234,8 @@ async function teruskanKeApi(
 // Pintu staf: /bff/staf/<jalur> -> /api/<jalur> dengan token dari cookie.
 export async function teruskanStaf(req: NextRequest, jalur: readonly string[]): Promise<Response> {
     if (!jalurStafBoleh(jalur)) return balasGalat(404, GALAT_RUTE)
-    if (req.method !== 'GET' && !asalSah(req)) {
-        return balasGalat(403, { code: 'forbidden', message: 'Permintaan ditolak.' })
+    if (METODE_TULIS.has(req.method) && !asalSah(req, { wajib: true })) {
+        return balasGalat(403, GALAT_ASAL)
     }
     const token = req.cookies.get(NAMA_COOKIE_SESI)?.value
     if (!token) return balasGalat(401, GALAT_TANPA_SESI)
@@ -224,8 +253,6 @@ export async function teruskanPublik(
     jalur: readonly string[],
 ): Promise<Response> {
     if (!rutePublikBoleh(req.method, jalur)) return balasGalat(404, GALAT_RUTE)
-    if (req.method !== 'GET' && !asalSah(req)) {
-        return balasGalat(403, { code: 'forbidden', message: 'Permintaan ditolak.' })
-    }
+    if (req.method !== 'GET' && !asalSah(req)) return balasGalat(403, GALAT_ASAL)
     return teruskanKeApi(req, `public/${jalur.join('/')}`)
 }

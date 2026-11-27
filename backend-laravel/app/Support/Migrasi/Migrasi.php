@@ -61,6 +61,9 @@ final class Migrasi
     /** Batas waktu menyambung ke MySQL, dalam detik. */
     private const BATAS_SAMBUNG = 10;
 
+    /** Versi MySQL terendah: CHECK baru ditegakkan mulai 8.0.16 (lihat periksaVersiServer). */
+    private const VERSI_MYSQL_MINIMAL = [8, 0, 16];
+
     /**
      * Membaca semua berkas *.up.sql di $dir, diurutkan menurut versi. Berkas
      * lain (.down.sql, README, cadangan .bak) diabaikan.
@@ -172,9 +175,12 @@ final class Migrasi
     }
 
     /**
-     * Menolak MariaDB dan MySQL di bawah 8.0. Skema memakai collation
+     * Menolak MariaDB dan MySQL di bawah 8.0.16. Skema memakai collation
      * utf8mb4_0900_ai_ci, CHECK, dan DEFAULT berupa ekspresi, yang hanya ada
-     * di MySQL 8.
+     * di MySQL 8. CHECK sendiri baru DITEGAKKAN mulai 8.0.16: versi 8.0
+     * yang lebih lama menerima sintaksnya tetapi diam-diam mengabaikannya,
+     * jadi aturan bisnis yang dijaga database (total SPK, stok tidak
+     * negatif, SPK diambil harus lunas) tidak berlaku tanpa ada galat.
      *
      * @param  string  $versi  hasil SELECT VERSION(), mis. "8.4.10" atau "10.4.32-MariaDB"
      *
@@ -186,12 +192,15 @@ final class Migrasi
             throw new RuntimeException(sprintf('server database ini MariaDB (%s), bukan MySQL. Aplikasi ini butuh MySQL 8; '
                 .'MySQL bawaan XAMPP sebenarnya MariaDB dan tidak bisa dipakai', $versi));
         }
-        $utama = explode('.', $versi, 2)[0];
-        if (preg_match('/^[0-9]+$/D', $utama) !== 1) {
+        // "8.0.36", "8.4.10-log", "8.0.15-0ubuntu0.18.04.1": cukup tiga angka
+        // pertama. Bagian yang tidak ditulis dianggap 0.
+        if (preg_match('/^([0-9]+)(?:\.([0-9]+))?(?:\.([0-9]+))?(?![0-9])/', $versi, $m) !== 1) {
             throw new RuntimeException(sprintf('versi server database "%s" tidak dikenali', $versi));
         }
-        if ((int) $utama < 8) {
-            throw new RuntimeException(sprintf('server database MySQL %s terlalu lama; butuh MySQL 8.0 ke atas (disarankan 8.4)', $versi));
+        $angka = [(int) $m[1], (int) ($m[2] ?? 0), (int) ($m[3] ?? 0)];
+        if ($angka < self::VERSI_MYSQL_MINIMAL) {
+            throw new RuntimeException(sprintf('server database MySQL %s terlalu lama; butuh MySQL 8.0.16 ke atas (disarankan 8.4), '
+                .'karena aturan CHECK di skema baru ditegakkan mulai MySQL 8.0.16', $versi));
         }
     }
 

@@ -212,8 +212,8 @@ pernah terlanjur, hapus dengan `php artisan config:clear`.
 ## Menjalankan
 
 Prasyarat: PHP 8.4 (ekstensi `pdo_mysql`, `mbstring`, `openssl`, `curl`;
-OPcache dianjurkan), Composer 2, dan Docker Desktop untuk MySQL (atau MySQL 8
-yang dipasang sendiri).
+OPcache dianjurkan), Composer 2, dan Docker Desktop untuk MySQL (atau MySQL
+8.0.16 ke atas yang dipasang sendiri; disarankan 8.4).
 
 ```sh
 # Dari folder project (satu tingkat di atas backend-laravel):
@@ -232,8 +232,8 @@ bila backend perlu dijangkau dari perangkat lain di jaringan yang sama.
 
 ### Tanpa Docker
 
-Dengan MySQL 8 yang dipasang sendiri (bukan MariaDB, jadi bukan XAMPP),
-jalankan `db/tanpa-docker.sql` di folder project sekali sebagai root, ganti
+Dengan MySQL 8.0.16 ke atas yang dipasang sendiri (disarankan 8.4; bukan
+MariaDB, jadi bukan XAMPP), jalankan `db/tanpa-docker.sql` di folder project sekali sebagai root, ganti
 port di `DATABASE_URL` ke port MySQL-mu (umumnya 3306), lalu dari folder
 backend-laravel:
 
@@ -247,7 +247,9 @@ Hanya `DATABASE_URL` yang dibaca, jadi tabel bisa dibuat sebelum env lain
 diisi. `bengkel:migrate` meniru golang-migrate (tabel `schema_migrations`,
 tanda kotor, kunci `GET_LOCK`), jadi satu database boleh dimigrasi
 bergantian lewat Docker atau lewat perintah ini. Hanya arah naik yang
-disediakan.
+disediakan. `bengkel:migrate` menolak MariaDB dan MySQL di bawah 8.0.16:
+`CHECK` di skema baru ditegakkan mulai 8.0.16, dan versi 8.0 yang lebih lama
+diam-diam mengabaikannya.
 
 ## Menguji
 
@@ -348,6 +350,14 @@ Untuk produksi pakai Nginx + PHP-FPM (bukan `php -S`). Hal yang wajib:
   `/servis/*`, `/admin/masuk`, dan `/admin/setup`. Aplikasi tidak menyimpan
   catatan per IP; ini pagar utama terhadap booking iseng selain batas tiga
   booking menunggu per nomor HP dan penerimaan staf.
+- **Batas masuk dihitung per email, bukan per IP.** Sepuluh percobaan masuk
+  yang gagal untuk satu email dalam 15 menit mengunci email itu 15 menit
+  (`login_attempts`, `AturanBatasMasuk`), siapa pun yang mencoba. Akibatnya,
+  orang yang tahu email pemilik bisa sengaja menguncinya 15 menit dengan sandi
+  asal-asalan, berulang-ulang. Ini disengaja (backend hanya melihat satu
+  alamat IP, yaitu server web) dan perilakunya tidak diubah; pagar utamanya
+  rate limit per IP di Nginx di depan `/admin/masuk` (lihat butir di atas),
+  yang membatasi seberapa cepat satu alamat bisa mencoba.
 - **Log**: `LogAkses` dan `LogGalat` mencatat pola rute, bukan path asli,
   supaya token booking dan token lacak tidak masuk log. Log akses Nginx sendiri
   mencatat path; matikan atau samarkan untuk lokasi `/api/public/`.
@@ -383,7 +393,7 @@ Penyedia lain dengan bentuk API berbeda cukup disesuaikan di
 | `bengkel:serve` berhenti dengan `konfigurasi tidak sah: …` | env yang disebut namanya kosong atau tidak sah; isi di `.env` atau shell |
 | `database tidak bisa dihubungi atau ditolak (galat 1045)` | sandi `DATABASE_URL` salah (1045), server mati (2002), atau database belum ada atau tanpa akses (1044/1049) |
 | `database … baru punya N dari 16 tabel` | jalankan migration: `docker compose run --rm migrate-dev up` atau `php artisan bengkel:migrate` |
-| `bengkel:migrate` gagal: `server database ini MariaDB` atau `terlalu lama` | pasang MySQL 8 (disarankan 8.4); "MySQL" bawaan XAMPP sebenarnya MariaDB |
+| `bengkel:migrate` gagal: `server database ini MariaDB` atau `terlalu lama` | pasang MySQL 8.0.16 ke atas (disarankan 8.4); "MySQL" bawaan XAMPP sebenarnya MariaDB |
 | semua rute 500 sesudah `config:cache` | `php artisan config:clear`; lihat peringatan di bagian Konfigurasi |
 | `Address already in use` | port `PORT` sudah dipakai proses lain; ganti `PORT` atau matikan prosesnya |
 | setiap permintaan yang menyentuh database lambat ±2 detik (Windows) | `DATABASE_URL` memakai `localhost`; ganti hostnya jadi `127.0.0.1` |
