@@ -14,12 +14,17 @@
 // - "gema-token": seperti status-false, tetapi "reason" memuat ulang isi
 //   header Authorization (ada penyedia yang begitu). Backend wajib
 //   menyamarkan WA_TOKEN sebelum menyimpan atau mencatat alasan.
-export type ModeGangguan = 'status-false' | 'http-500' | 'putus' | 'alasan-panjang' | 'gema-token';
-export const MODE_GANGGUAN: readonly ModeGangguan[] = ['status-false', 'http-500', 'putus', 'alasan-panjang', 'gema-token'];
+// - "status-besar": HTTP 200 dengan {"Status": false, "reason": ...} tanpa
+//   field "status" huruf kecil, seperti dua contoh pertama di dokumentasi
+//   Fonnte. Backend yang membaca kunci tanpa peka huruf, atau yang menganggap
+//   "tidak ada status false" sebagai sukses, akan salah mencatat terkirim.
+export type ModeGangguan = 'status-false' | 'http-500' | 'putus' | 'alasan-panjang' | 'gema-token' | 'status-besar';
+export const MODE_GANGGUAN: readonly ModeGangguan[] = ['status-false', 'http-500', 'putus', 'alasan-panjang', 'gema-token', 'status-besar'];
 
-// Jeda paling lama yang boleh diatur, supaya tes yang lupa mematikannya
-// tidak menahan backend melewati batas waktu 10 detiknya.
-export const JEDA_MAKS_MS = 5000;
+// Jeda paling lama yang boleh diatur. Lebih dari batas waktu 10 detik milik
+// backend, supaya waktu habis bisa diuji, tetapi tetap dibatasi supaya tes
+// yang lupa mematikannya tidak menahan koneksi tanpa akhir.
+export const JEDA_MAKS_MS = 15_000;
 
 export interface Pesan {
   // Nomor urut pesan yang diterima, mulai 1; juga dipakai sebagai "id" balasan.
@@ -34,7 +39,10 @@ export interface Pesan {
 
 // "diproses" = permintaan sudah tiba dan sedang ditahan jeda; tes memakainya
 // untuk tahu persis kapan backend sedang menunggu penyedia WhatsApp.
-export type HasilPermintaan = 'diproses' | 'terkirim' | 'ditolak' | 'gangguan';
+// "ditinggal" = pengirim menutup koneksi sebelum balasan dikirim (mis. batas
+// waktu 10 detik backend habis selama jeda); pesannya tidak disimpan, karena
+// backend sudah mencatatnya gagal.
+export type HasilPermintaan = 'diproses' | 'terkirim' | 'ditolak' | 'gangguan' | 'ditinggal';
 
 // Setiap permintaan ke /send, termasuk yang ditolak, supaya alasan
 // penolakan bisa dibaca saat tes gagal. Token tidak pernah disimpan.

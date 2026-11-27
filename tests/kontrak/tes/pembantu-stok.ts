@@ -70,8 +70,8 @@ export function ringkasStaf(sesi: SesiStaf): { staffId: string; name: string } {
   return { staffId: sesi.staff.staffId, name: sesi.staff.name };
 }
 
-// Sparepart tanpa updatedAt (spec tidak menyebut apakah updatedAt bergeser pada PATCH {} atau
-// pencatatan stok).
+// Sparepart tanpa updatedAt (PATCH {} tidak menggesernya, diuji di waktu-ubah.test.ts; spec tidak
+// menyebut apakah pencatatan stok menggesernya).
 export function tanpaWaktuPart<T extends object>(part: T): Omit<T, 'updatedAt'> {
   const { updatedAt: _abaikan, ...sisa } = part as T & { updatedAt?: unknown };
   return sisa;

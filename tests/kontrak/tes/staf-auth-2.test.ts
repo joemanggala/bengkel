@@ -2,10 +2,11 @@
 // Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
 
 import { describe, expect, it } from 'vitest';
-import { emailUnik, SANDI_UJI } from '../src/data';
+import { buatKasir, buatPelanggan, emailUnik, masukStaf, SANDI_UJI } from '../src/data';
+import { geserSesi, waktuSesi } from '../src/db';
 import { harapGalat, harapStatus } from '../src/galat';
 import { api, type Respons } from '../src/klien';
-import { JSON_RUSAK } from './pembantu-fondasi';
+import { JSON_RUSAK, mintaLangsung, SEHARI } from './pembantu-fondasi';
 import { masuk, masukDengan, stafLangsung } from './pembantu-staf';
 
 // Batas percobaan masuk (langkah 3 POST /api/staff/login): email yang sama
@@ -146,5 +147,67 @@ describe('POST /api/staff/login: batas percobaan', () => {
       harapGalat(res, res.status, res.status === 401 ? 'invalid_credentials' : 'too_many_requests');
     }
     harapGalat(await masukDengan(email, SANDI_UJI), 429, 'too_many_requests');
+  });
+});
+
+describe('POST /api/staff/login: email non-ASCII ikut dihitung', () => {
+  it('email non-ASCII (pasti tidak terdaftar) 10 kali → 401; ke-11 → 429 dengan Retry-After, bukan 401 atau 500', async () => {
+    const email = emailUnik('jösé-batas');
+    await salahSebanyak(email, MAKS_PERCOBAAN);
+
+    const ditolak = await masukDengan(email, SANDI_SALAH);
+    harapGalat(ditolak, 429, 'too_many_requests');
+    expect(retryAfter(ditolak)).toBeGreaterThanOrEqual(DURASI_KUNCI_DETIK - 20);
+    // Bentuk huruf besarnya (A-Z saja yang dikecilkan) berbagi hitungan yang sama.
+    harapGalat(await masukDengan(email.toUpperCase().replace('JÖSÉ', 'jösé'), SANDI_SALAH), 429, 'too_many_requests');
+  });
+});
+
+describe('sesi bergeser untuk setiap permintaan yang lolos autentikasi', () => {
+  // Sesi dibuat ulang tiap kasus lalu dimundurkan: last_used_at satu jam lalu,
+  // kedaluwarsa satu jam lagi.
+  async function sesiTua(email: string): Promise<string> {
+    const sesi = await masukStaf(email);
+    await geserSesi(sesi.token, { kedaluwarsaDetik: 3600, terakhirDipakaiDetikLalu: 3600 });
+    return sesi.token;
+  }
+
+  it('balasan 403, 404, 422, dan 409 sesudah autentikasi tetap memperpanjang sesi menjadi 30 hari', async () => {
+    const kasir = await buatKasir();
+    const pelanggan = await buatPelanggan(kasir.token);
+    const kasus: Array<[string, (token: string) => Promise<{ status: number }>, number]> = [
+      ['403 peran', (token) => api.get('/api/staff', { token }), 403],
+      ['404 sumber', (token) => api.get('/api/customers/77777777-7777-4777-8777-777777777777', { token }), 404],
+      ['422 query', (token) => api.get('/api/customers', { token, query: { page: 'abc' } }), 422],
+      ['409 nomor HP', (token) => api.post('/api/customers', { token, json: { name: 'Pelanggan Kembar', phone: pelanggan.phone } }), 409],
+    ];
+
+    for (const [nama, panggil, status] of kasus) {
+      const token = await sesiTua(kasir.staff.email);
+
+      expect((await panggil(token)).status, nama).toBe(status);
+
+      const waktu = await waktuSesi(token);
+      expect(waktu?.sisa, nama).toBeGreaterThanOrEqual(30 * SEHARI - 300);
+      expect(waktu?.sejakDipakai, nama).toBeLessThanOrEqual(60);
+    }
+  });
+
+  it('permintaan yang ditolak sebelum autentikasi (rute tak dikenal, JSON rusak) tidak menyentuh sesi', async () => {
+    const kasir = await buatKasir();
+    const kasus: Array<[string, (token: string) => Promise<{ status: number }>, number]> = [
+      ['rute tak dikenal', (token) => mintaLangsung('GET', '/api/tidak-ada', { header: { Authorization: `Bearer ${token}` } }), 404],
+      ['JSON rusak', (token) => api.post('/api/customers', { token, mentah: JSON_RUSAK }), 400],
+    ];
+
+    for (const [nama, panggil, status] of kasus) {
+      const token = await sesiTua(kasir.staff.email);
+
+      expect((await panggil(token)).status, nama).toBe(status);
+
+      const waktu = await waktuSesi(token);
+      expect(waktu?.sisa, nama).toBeLessThanOrEqual(3600);
+      expect(waktu?.sejakDipakai, nama).toBeGreaterThanOrEqual(3500);
+    }
   });
 });

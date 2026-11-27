@@ -18,6 +18,7 @@ import {
   buatUlangTautan,
   detailSpk,
   lacakPublik,
+  nomorUnik,
   siapkanBengkel,
   spkBerisi,
   ubahStatus,
@@ -141,6 +142,20 @@ describe('GET /api/public/work-orders/{trackingToken}: isi respons', () => {
     const data = await lacakPublik(spk.trackingToken);
     expect(data).toMatchObject({ status: 'DONE', paymentStatus: 'paid', paidAmount: 90_000, remainingAmount: 0 });
     expect(data.timeline.map((l: any) => l.toStatus)).toEqual(['QUEUED', 'IN_PROGRESS', 'DONE']);
+  });
+
+  it('nama, nomor HP, dan kendaraan adalah data saat ini: perubahan pelanggan dan kendaraan sesudah SPK dibuat langsung tampil', async () => {
+    const { pelanggan, kendaraan } = await buatPelangganDenganKendaraan(b.kasir.token);
+    const spk = await buatSpk(b.kasir.token, kendaraan.vehicleId);
+    const nomorBaru = nomorUnik();
+
+    wajib(await api.patch(`/api/customers/${pelanggan.customerId}`, { token: b.kasir.token, json: { name: 'Nama Baru Pelanggan', phone: nomorBaru } }), 200);
+    wajib(await api.patch(`/api/vehicles/${kendaraan.vehicleId}`, { token: b.kasir.token, json: { type: 'CAR', plate: 'f 77 zz', brand: 'Toyota', model: '' } }), 200);
+
+    const data = await lacakPublik(spk.trackingToken);
+    expect(data).toMatchObject({ customerName: 'Nama Baru Pelanggan', customerPhone: samarkanHp(nomorBaru) });
+    expect(data.vehicle).toEqual({ type: 'CAR', plate: 'F 77 ZZ', brand: 'Toyota', model: '' });
+    harapSetara(data, await publikDari(await detailSpk(b.kasir.token, spk.number)));
   });
 
   it('header Authorization apa pun diabaikan (rute publik)', async () => {

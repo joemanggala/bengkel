@@ -148,7 +148,7 @@ LogStatus:
       $ref: './staf.yaml#/StafRingkas'
     note:
       type: string
-      description: Catatan staf saat mengubah status (boleh kosong). Untuk `CANCELLED` berisi alasan batal. Tidak tampil di halaman publik.
+      description: Catatan staf saat mengubah status (boleh kosong). Untuk `CANCELLED` berisi alasan batal yang sudah dipangkas, sama persis dengan `cancelReason`. Tidak tampil di halaman publik.
     createdAt:
       type: string
       format: date-time
@@ -262,7 +262,7 @@ SpkRingkas:
     updatedAt:
       type: string
       format: date-time
-      description: Berubah setiap kali SPK, itemnya, statusnya, atau pembayarannya berubah. Web memakainya untuk tahu ada perubahan saat memuat ulang berkala.
+      description: Berubah setiap kali SPK, itemnya, statusnya, pembayarannya, atau token lacaknya berubah (lihat "Waktu" di deskripsi API); `PATCH {}` dan pengiriman WhatsApp tidak mengubahnya. Web memakainya untuk tahu ada perubahan saat memuat ulang berkala.
 
 SpkDetail:
   type: object
@@ -277,6 +277,9 @@ SpkDetail:
     kasir bisa menyalinnya kapan saja (keputusan Bagian 0a, sama dengan
     `qr_token` meja di kafe-resto). Membuat ulang
     (`POST /api/work-orders/{number}/tracking-link`) mematikan token lama.
+    Mekanik yang membuka SPK miliknya juga menerima `trackingToken` (rincian
+    yang sama dengan kasir); token itu hanya membuka halaman lacak
+    pelanggan.
   additionalProperties: false
   required:
     - number
@@ -399,7 +402,9 @@ SpkPublik:
     online: profil outlet, status, linimasa tanpa catatan dan nama staf,
     kendaraan, item tanpa harga beli, total, terbayar, dan sisa. Tidak memuat
     nama mekanik, diagnosis, data staf, pembayaran per baris, status
-    WhatsApp, maupun token. Nomor HP disamarkan.
+    WhatsApp, maupun token. Nomor HP disamarkan. `customerName`,
+    `customerPhone`, dan `vehicle` adalah data pelanggan dan kendaraan
+    **saat ini** (sama dengan rincian staf), bukan salinan saat SPK dibuat.
   additionalProperties: false
   required:
     - outlet
@@ -541,7 +546,8 @@ UbahSpkRequest:
   type: object
   description: |
     Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
-    membalas 200 tanpa perubahan (juga untuk mekanik). `null` pada
+    membalas 200 tanpa perubahan apa pun, termasuk `updatedAt` (juga
+    untuk mekanik). `null` pada
     `complaint` → `required`; `null` pada `diagnosis` → `invalid_type`;
     `null` pada `mechanicId`, `odometer`, atau `estimatedDoneAt` =
     mengosongkannya. Field lain di badan diabaikan.

@@ -112,8 +112,8 @@ export async function aturWaktuKendaraan(vehicleId: string, waktuUtc: string | D
   }
 }
 
-// Objek tanpa updatedAt: "tanpa perubahan" di PATCH {} dinilai dari isi, bukan dari waktu ubah
-// (spec tidak menyebut apakah updatedAt ikut bergeser).
+// Objek tanpa updatedAt: "tanpa perubahan" dinilai dari isi. Aturan updatedAt sendiri (PATCH {}
+// tidak menggesernya) diuji di waktu-ubah.test.ts.
 export function tanpaUpdatedAt<T extends object>(x: T): Omit<T, 'updatedAt'> {
   const { updatedAt: _abaikan, ...sisa } = x as T & { updatedAt?: unknown };
   return sisa;

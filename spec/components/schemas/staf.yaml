@@ -34,7 +34,7 @@ Staf:
 
 StafRingkas:
   type: object
-  description: Staf yang melakukan sesuatu (membuat SPK, mencatat pembayaran, mengubah status) atau mekanik yang ditugaskan.
+  description: Staf yang melakukan sesuatu (membuat SPK, mencatat pembayaran, mengubah status) atau mekanik yang ditugaskan. `name` adalah nama staf **saat ini** (dibaca dari tabel `staff`, bukan salinan saat tindakan dilakukan), juga untuk staf yang sudah nonaktif.
   additionalProperties: false
   required: [staffId, name]
   properties:

@@ -46,16 +46,21 @@ Search:
       sparepart): `kolom LIKE CONCAT('%', ?, '%')` dengan collation kolom
       (`utf8mb4_0900_ai_ci` untuk nama, jadi huruf besar/kecil dan aksen
       tidak membedakan; SKU dicocokkan dengan term yang huruf a-z-nya
-      dibesarkan). Karakter `%`, `_`, dan `\` dicocokkan apa adanya: ganti
+      dibesarkan). Term yang memuat karakter non-ASCII **tidak pernah
+      cocok dengan SKU** (kolom SKU ASCII; jangan sampai perbandingannya
+      menjadi galat collation), tetapi tetap bisa cocok dengan nama.
+      Karakter `%`, `_`, dan `\` dicocokkan apa adanya: ganti
       `\` → `\\` lebih dulu, lalu `%` → `\%` dan `_` → `\_`, dengan karakter
       escape bawaan MySQL (`\`), dan term dikirim sebagai parameter.
     - **Nomor** (nomor SPK, nomor booking): huruf a-z di dalam term
       dibesarkan, lalu cocok bila menjadi bagian dari nomor. Jadi `s-0001`
-      dan `0001` menemukan `S-0001`.
+      dan `0001` menemukan `S-0001`. Term yang memuat karakter non-ASCII
+      (mis. huruf lebar penuh `Ｓ-0001`) tidak pernah cocok dengan nomor.
     - **Nomor HP**: buang spasi dan tanda hubung dari term. Bila hasilnya
       cocok dengan `^\+?[0-9]+$`: awalan `+62` diganti `62`, awalan `0`
       diganti `62`, lalu cocok bila menjadi bagian dari nomor seragam. Jadi
-      `0812-34` dan `81234` sama-sama menemukan `6281234567890`. Term lain
+      `0812-34` dan `81234` sama-sama menemukan `6281234567890`. Term
+      berawalan `+` selain `+62` (mis. `+81234`, `+0812`) dan term lain
       tidak pernah cocok dengan nomor HP.
     - **Plat**: buang spasi, tanda hubung, dan titik dari term, lalu
       besarkan a-z. Bila hasilnya tidak kosong dan hanya berisi A-Z dan
@@ -199,7 +204,9 @@ PlateQuery:
     dibuang dan a-z dibesarkan. Tidak dikirim, kosong, atau kosong sesudah
     dinormalkan → 422 `fields.plate: required`; memuat karakter selain A-Z
     dan 0-9 sesudah dinormalkan → `invalid_format`; lebih dari 12 karakter
-    → `too_long`. Boleh diawali angka (`1234` mencari bagian tengah).
+    → `too_long`. Format dinilai **sebelum** panjang, sama seperti
+    `PlatMasukan` (13 karakter yang memuat `/` → `invalid_format`). Boleh
+    diawali angka (`1234` mencari bagian tengah).
     Cocok bila hasil normalisasi menjadi bagian dari kunci plat.
   schema:
     type: string

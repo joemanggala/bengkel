@@ -149,6 +149,8 @@ describe('GET /api/parts: filter', () => {
     ['SKU dengan huruf kecil', { search: 'aki-5' }, ['aki']],
     ['SKU (disimpan huruf besar dari masukan huruf kecil)', { search: 'BUSI-IR' }, ['busi']],
     ['SKU yang cocok dua sparepart', { search: 'kr-0' }, ['kampas1', 'kampas2']],
+    ['term non-ASCII tidak pernah cocok dengan SKU (bukan galat collation)', { search: 'émb-01' }, []],
+    ['term non-ASCII tidak pernah cocok dengan SKU, juga huruf lebar penuh', { search: 'ＫＲ-01' }, []],
     ['nama atau SKU, nonaktif ikut', { search: 'oli' }, ['oli']],
     ['% dicocokkan apa adanya', { search: '50%' }, ['filterP']],
     ['_ dicocokkan apa adanya', { search: '_U' }, ['filterP']],

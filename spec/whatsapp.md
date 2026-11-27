@@ -61,7 +61,9 @@ message = <isi pesan, bagian 5>
 - Pergantian baris di `message` ditulis LF. Pustaka `multipart` yang mengikuti standar HTML
   (mis. `FormData` di Node) mengubahnya menjadi CRLF; itu boleh. Penerima dan tes membandingkan
   isi sesudah CRLF diganti LF.
-- Batas waktu 10 detik untuk seluruh permintaan.
+- Batas waktu 10 detik untuk seluruh permintaan: balasan yang tiba sebelum 10 detik wajib
+  ditunggu (balasan sesudah 8 detik tetap bisa terkirim), sedangkan penyedia yang belum membalas
+  sesudah 10 detik dianggap gagal (waktu habis) dan backend tidak menunggu lebih lama.
 
 **Dianggap terkirim** hanya bila: status HTTP 2xx **dan** badannya objek JSON **dan** field
 `status` bernilai boolean `true`. Selain itu gagal, termasuk status HTTP lain, badan bukan JSON,
@@ -92,9 +94,10 @@ bunyinya tidak dibandingkan tes. Urutannya:
 - **Tidak ada pesan dari form publik.** `POST /api/public/bookings` tidak mengirim apa pun,
   karena nomor di form bisa milik orang lain. Pesan booking baru dikirim sesudah **staf**
   mengonfirmasi atau menolaknya, satu kali per tindakan, dan isinya tidak memuat teks bebas
-  ketikan pemesan (nama, merek, keluhan), hanya nomor booking, plat (huruf dan angka saja),
-  tanggal, nama jasa dari katalog, dan teks milik bengkel. Jadi yang bisa sampai ke nomor orang
-  lain hanya teks milik bengkel.
+  ketikan pemesan (nama, merek, keluhan), hanya nomor booking, plat dalam bentuk tampilan
+  (`PlatTampilan`, bagian 4, mis. `B 1234 XYZ`; hanya huruf, angka, dan spasi), tanggal, nama
+  jasa dari katalog, dan teks milik bengkel. Jadi yang bisa sampai ke nomor orang lain hanya
+  teks milik bengkel.
 - Pesan SPK dikirim ke nomor pelanggan yang dicatat kasir saat pelanggan datang, jadi memuat
   nama pelanggan dan tidak dibatasi jumlahnya.
 - Pengiriman sinkron di dalam permintaan HTTP, **sesudah transaksinya di-commit**, bukan lewat
@@ -371,5 +374,8 @@ untuk E2E. Perilaku dan endpoint kendalinya mengikuti WhatsApp palsu kafe-resto:
 meniru Fonnte (balasan HTTP 200 dengan `"status": false` dan `reason` untuk token salah, badan
 bukan `multipart/form-data`, field selain tepat `target` dan `message`, atau `target` yang bukan
 satu nomor `628…`), sehingga backend yang hanya memeriksa status HTTP akan salah mencatat pesan
-gagal sebagai terkirim, dan tes menangkapnya. Rincian dan cara menyalakannya ditulis Bagian 0b
-di `docs/menjalankan.md`.
+gagal sebagai terkirim, dan tes menangkapnya. Mode gangguan `status-besar` membalas
+`{"Status": false, "reason": …}` tanpa `status` (bagian 2: gagal), dan jeda balasan bisa diatur
+sampai 15 detik, sehingga batas waktu 10 detik bisa diuji: pesan yang ditinggal pengirim sebelum
+jedanya habis tidak disimpan. Rincian dan cara menyalakannya ditulis Bagian 0b di
+`docs/menjalankan.md`.

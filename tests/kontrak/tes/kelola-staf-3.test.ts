@@ -174,3 +174,42 @@ describe('perubahan staf dan SPK yang sudah ditugaskan', () => {
     harapStatus(await mekanikAktif(mekanik.token), 200);
   });
 });
+
+describe('nama dan email staf yang diganti', () => {
+  it('nama mekanik dan kasir yang diganti langsung terlihat di SPK lama: mekanik, pembuat, linimasa, dan daftar SPK', async () => {
+    const mekanik = await buatMekanik({ name: 'Lukman Mekanik' });
+    const pembuat = await buatKasir({ name: 'Maya Kasir' });
+    const { kendaraan } = await buatPelangganDenganKendaraan(pembuat.token);
+    const spk = await buatSpk(pembuat.token, kendaraan.vehicleId, { mechanicId: mekanik.staff.staffId });
+    harapStatus(await api.post(`/api/work-orders/${spk.number}/status`, { token: mekanik.token, json: { status: 'IN_PROGRESS' } }), 200);
+
+    harapStatus(await ubah(mekanik.staff.staffId, { name: 'Lukman Hakim' }), 200);
+    harapStatus(await ubah(pembuat.staff.staffId, { name: 'Maya Sari' }), 200);
+
+    const namaMekanik = { staffId: mekanik.staff.staffId, name: 'Lukman Hakim' };
+    const namaPembuat = { staffId: pembuat.staff.staffId, name: 'Maya Sari' };
+    const rincian = await detailSpk(kasir.token, spk.number);
+    expect(rincian.mechanic).toEqual(namaMekanik);
+    expect(rincian.createdBy).toEqual(namaPembuat);
+    expect(rincian.timeline.map((l: any) => l.by)).toEqual([namaPembuat, namaMekanik]);
+    const daftar = await api.get('/api/work-orders', { token: kasir.token, query: { search: spk.number, limit: 50 } });
+    harapStatus(daftar, 200);
+    expect(daftar.body.data.find((s: any) => s.number === spk.number)?.mechanic).toEqual(namaMekanik);
+  });
+
+  it('mengganti nama dan email tidak mengakhiri sesi mana pun; /api/staff/me langsung membalas nilai baru; masuk berikutnya memakai email baru', async () => {
+    const staf = await buatKasir({ name: 'Nina Kasir' });
+    const sesiLain = await masukStaf(staf.staff.email);
+    const emailBaru = emailUnik('nina-baru');
+
+    harapStatus(await ubah(staf.staff.staffId, { name: 'Nina Lestari', email: emailBaru.toUpperCase() }), 200);
+
+    for (const token of [staf.token, sesiLain.token]) {
+      const saya = await api.get('/api/staff/me', { token });
+      harapStatus(saya, 200);
+      expect(saya.body.data).toMatchObject({ staffId: staf.staff.staffId, name: 'Nina Lestari', email: emailBaru, role: 'cashier' });
+    }
+    harapGalat(await masukDengan(staf.staff.email), 401, 'invalid_credentials');
+    harapStatus(await masukDengan(emailBaru), 200);
+  });
+});

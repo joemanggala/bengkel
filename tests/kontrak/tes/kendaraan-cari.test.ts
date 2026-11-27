@@ -120,6 +120,8 @@ describe('GET /api/vehicles?plate=', () => {
     ['garis miring', 'plate=B%2F1', { plate: 'invalid_format' }],
     ['huruf non-ASCII', 'plate=%C3%891', { plate: 'invalid_format' }],
     ['13 karakter sesudah dinormalkan', 'plate=B+1234+ABCDEFGH', { plate: 'too_long' }],
+    ['13 karakter bergaris miring (format sebelum panjang)', 'plate=B%2F1234ABCDEFG', { plate: 'invalid_format' }],
+    ['20 karakter berhuruf non-ASCII (format sebelum panjang)', 'plate=%C3%89BCDEFGHIJ1234567890', { plate: 'invalid_format' }],
     ['plate kosong dan page salah sekaligus', 'page=0&limit=x', { plate: 'required', page: 'out_of_range', limit: 'invalid_format' }],
     ['limit=51', 'plate=B&limit=51', { limit: 'out_of_range' }],
   ])('%s → 422', async (_judul, query, fields) => {

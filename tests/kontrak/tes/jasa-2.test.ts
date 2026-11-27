@@ -55,7 +55,7 @@ describe('PATCH /api/services/{serviceId}', () => {
 
     harapStatus(res, 200);
     expect(Object.keys(res.body.data).sort()).toEqual(KUNCI_JASA);
-    // updatedAt tidak dibandingkan: spec tidak menentukan nilainya sesudah PATCH.
+    // updatedAt tidak dibandingkan di sini; aturannya diuji di waktu-ubah.test.ts.
     harapSetara({ ...res.body.data, updatedAt: undefined }, { ...jasa, name: nama, price: 40000, updatedAt: undefined });
     expect(await jasaApi(jasa.serviceId)).toEqual(res.body.data);
   });

@@ -272,15 +272,15 @@ describe('POST /api/public/bookings: urutan 413 → 400 → 422 → 409', () => 
     harapGalat(await api.post('/api/public/bookings', { mentah }), 400, 'bad_request');
   });
 
-  it('byte UTF-8 tidak sah, surrogat tunggal, dan sarang lebih dari 64 tingkat → 400; sarang 10 tingkat di field tak dikenal lolos', async () => {
+  it('byte UTF-8 tidak sah, surrogat tunggal, dan 65 tingkat → 400; tepat 64 tingkat (objek badan + 63 larik) lolos', async () => {
     harapGalat(await api.post('/api/public/bookings', { biner: badanUtf8Rusak() }), 400, 'bad_request');
 
     const isian = await isianBooking({ customerName: 'BuXXdi' });
     const surrogat = JSON.stringify(isian).replace('BuXXdi', 'Bu\\ud800di');
     harapGalat(await api.post('/api/public/bookings', { mentah: surrogat }), 400, 'bad_request');
 
-    harapGalat(await api.post('/api/public/bookings', { mentah: badanBersarang(isian, 100) }), 400, 'bad_request');
-    harapStatus(await api.post('/api/public/bookings', { mentah: badanBersarang(isian, 10) }), 201);
+    harapGalat(await api.post('/api/public/bookings', { mentah: badanBersarang(isian, 64) }), 400, 'bad_request');
+    harapStatus(await api.post('/api/public/bookings', { mentah: badanBersarang(isian, 63) }), 201);
   });
 
   it('422 dinilai sebelum 409: nomor yang sudah punya 3 booking menunggu dengan plat salah → 422, isian sah → 409', async () => {
@@ -468,9 +468,12 @@ describe('POST /api/public/bookings/{bookingToken}/cancel', () => {
     },
   );
 
-  it('badan diabaikan, termasuk JSON rusak: PENDING tetap 200; Authorization juga diabaikan', async () => {
+  it('badan diabaikan, termasuk JSON rusak dan badan lebih dari 1 MiB (tanpa 400/413): PENDING tetap 200; Authorization juga diabaikan', async () => {
     const satu = await buatBookingPublik();
     harapStatus(await batalkanBookingPublik(satu.bookingToken, { mentah: JSON_RUSAK }), 200);
+    const besar = await buatBookingPublik();
+    harapStatus(await batalkanBookingPublik(besar.bookingToken, { mentah: `${JSON_RUSAK}${jsonLebihDariSatuMib()}` }), 200);
+    harapGalat(await batalkanBookingPublik(tokenAcak(), { mentah: jsonLebihDariSatuMib() }), 404, 'not_found');
 
     const dua = await buatBookingPublik();
     harapStatus(await batalkanBookingPublik(dua.bookingToken, { token: b.kasir.token, json: { status: 'CONFIRMED' } }), 200);

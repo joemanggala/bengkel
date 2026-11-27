@@ -222,6 +222,8 @@ describe('POST /api/work-orders: validasi (semua field dilaporkan sekaligus)', (
     ['vehicleId angka', { vehicleId: 12 }, { vehicleId: 'invalid_type' }],
     ['vehicleId bukan UUID', { vehicleId: 'kendaraan-1' }, { vehicleId: 'invalid_format' }],
     ['vehicleId huruf besar', { vehicleId: 'UPPER' }, { vehicleId: 'invalid_format' }],
+    ['vehicleId hanya spasi (UUID tidak dipangkas)', { vehicleId: '  ' }, { vehicleId: 'invalid_format' }],
+    ['vehicleId sah diapit spasi', { vehicleId: 'BERSPASI' }, { vehicleId: 'invalid_format' }],
     ['vehicleId tidak ada', { vehicleId: 'ACAK' }, { vehicleId: 'unknown_reference' }],
     ['complaint tidak dikirim', { complaint: undefined }, { complaint: 'required' }],
     ['complaint null', { complaint: null }, { complaint: 'required' }],
@@ -241,7 +243,11 @@ describe('POST /api/work-orders: validasi (semua field dilaporkan sekaligus)', (
     ['estimatedDoneAt zona +14:30', { estimatedDoneAt: '2026-11-28T10:00:00+14:30' }, { estimatedDoneAt: 'invalid_format' }],
     ['estimatedDoneAt sebelum 2000', { estimatedDoneAt: '1999-12-31T23:59:59.999Z' }, { estimatedDoneAt: 'out_of_range' }],
     ['estimatedDoneAt sesudah 2999 (UTC)', { estimatedDoneAt: '2999-12-31T23:00:00-01:00' }, { estimatedDoneAt: 'out_of_range' }],
+    ['estimatedDoneAt string kosong', { estimatedDoneAt: '' }, { estimatedDoneAt: 'invalid_format' }],
+    ['estimatedDoneAt berspasi (tidak dipangkas)', { estimatedDoneAt: ' 2026-11-28T15:00:00Z' }, { estimatedDoneAt: 'invalid_format' }],
+    ['estimatedDoneAt tahun 0000', { estimatedDoneAt: '0000-01-01T00:00:00Z' }, { estimatedDoneAt: 'out_of_range' }],
     ['mechanicId kosong', { mechanicId: '' }, { mechanicId: 'required' }],
+    ['mechanicId hanya spasi', { mechanicId: '  ' }, { mechanicId: 'invalid_format' }],
     ['mechanicId angka', { mechanicId: 7 }, { mechanicId: 'invalid_type' }],
     ['mechanicId bukan UUID', { mechanicId: 'andi' }, { mechanicId: 'invalid_format' }],
     ['mechanicId tidak ada', { mechanicId: 'ACAK' }, { mechanicId: 'unknown_reference' }],
@@ -251,6 +257,7 @@ describe('POST /api/work-orders: validasi (semua field dilaporkan sekaligus)', (
       if (v === undefined) delete isi[k];
       else if (v === 'ACAK') isi[k] = uuidAcak();
       else if (v === 'UPPER') isi[k] = b.kendaraan.vehicleId.toUpperCase();
+      else if (v === 'BERSPASI') isi[k] = ` ${b.kendaraan.vehicleId}\n`;
       else isi[k] = v;
     }
 
@@ -381,7 +388,10 @@ describe('GET /api/work-orders/{number}: urutan 401 → 404 → 403', () => {
     const punyaLain = await buatSpk(b.kasir.token, b.kendaraan.vehicleId, { mechanicId: lain.staff.staffId });
     const tanpa = await buatSpk(b.kasir.token, b.kendaraan.vehicleId);
 
-    harapSetara(await detailSpk(b.mekanik.token, milik.number), await detailSpk(b.kasir.token, milik.number));
+    const rincianMekanik = await detailSpk(b.mekanik.token, milik.number);
+    harapSetara(rincianMekanik, await detailSpk(b.kasir.token, milik.number));
+    // Mekanik boleh menerima trackingToken SPK miliknya (keputusan koordinator 0b).
+    expect(rincianMekanik.trackingToken).toBe((await barisSpk(milik.number)).tracking_token);
     harapGalat(await ambilSpk(b.mekanik.token, punyaLain.number), 403, 'forbidden');
     harapGalat(await ambilSpk(b.mekanik.token, tanpa.number), 403, 'forbidden');
     harapGalat(await ambilSpk(b.mekanik.token, 'S-999999'), 404, 'not_found');

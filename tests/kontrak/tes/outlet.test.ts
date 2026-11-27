@@ -102,6 +102,14 @@ describe('PUT /api/outlet', () => {
     expect(res.body.data).toMatchObject({ name: ' Bengkel ', tagline: ' Cepat ' });
   });
 
+  it('tagline tidak diperiksa isinya: pergantian baris di tengah diterima dan disimpan apa adanya', async () => {
+    const res = await ganti({ tagline: ' Servis cepat\nHarga jujur\r\n' });
+
+    harapStatus(res, 200);
+    expect(res.body.data.tagline).toBe('Servis cepat\nHarga jujur');
+    expect((await api.get('/api/outlet')).body.data.tagline).toBe('Servis cepat\nHarga jujur');
+  });
+
   it.each(['0812-9999-0000', '+62 812 9999 0000', '6281299990000', '  0812 9999 0000\n', '+62-812-9999-0000', '62 812-9999 0000'])(
     'nomor %j diseragamkan menjadi 6281299990000',
     async (phone) => {
@@ -119,7 +127,15 @@ describe('PUT /api/outlet', () => {
     harapGalat(await ganti({ phone: '0812345678901234'.slice(0, 15) }), 422, 'validation_failed', { phone: 'too_long' });
   });
 
-  it.each(['http://contoh.id', 'https://maps.app.goo.gl/AbCd123', 'https://maps.google.com/?q=-6.9175,107.6191&z=17', `https://contoh.id/${'a'.repeat(482)}`])(
+  it.each([
+    'http://contoh.id',
+    'https://maps.app.goo.gl/AbCd123',
+    'https://maps.google.com/?q=-6.9175,107.6191&z=17',
+    `https://contoh.id/${'a'.repeat(482)}`,
+    // Semua ASCII terlihat 0x21–0x7E boleh, termasuk tanda baca dan %XX.
+    "https://contoh.id/a!\"#$%25&'()*+,-./:;<=>?@[\\]^_`{|}~z",
+    'https://contoh.id/jalan-merd%C3%A9ka',
+  ])(
     'tautan peta sah %s diterima apa adanya',
     async (mapsUrl) => {
       const res = await ganti({ mapsUrl });
@@ -188,6 +204,13 @@ describe('PUT /api/outlet', () => {
     ['tautan peta bertab di tengah', { mapsUrl: 'https://contoh\t.id' }, { mapsUrl: 'invalid_format' }],
     ['tautan peta ber-LF di tengah', { mapsUrl: 'https://contoh.id/\nx' }, { mapsUrl: 'invalid_format' }],
     ['tautan peta diawali teks lain', { mapsUrl: 'lihat https://contoh.id' }, { mapsUrl: 'invalid_format' }],
+    // Hanya ASCII terlihat U+0021–U+007E sesudah skema (bukan \s/\S yang berbeda di PCRE, JS, dan Go).
+    ['tautan peta ber-NBSP di tengah', { mapsUrl: 'https://contoh.id/ x' }, { mapsUrl: 'invalid_format' }],
+    ['tautan peta berhuruf non-ASCII', { mapsUrl: 'https://contoh.id/jalan-merdéka' }, { mapsUrl: 'invalid_format' }],
+    ['tautan peta ber-U+2028', { mapsUrl: 'https://contoh.id/ x' }, { mapsUrl: 'invalid_format' }],
+    ['tautan peta ber-DEL (U+007F)', { mapsUrl: 'https://contoh.id/\u007fx' }, { mapsUrl: 'invalid_format' }],
+    ['tautan peta ber-U+0085', { mapsUrl: 'https://contoh.id/\u0085x' }, { mapsUrl: 'invalid_format' }],
+    ['tautan peta ber-U+3000 (spasi lebar penuh)', { mapsUrl: 'https://contoh.id/　x' }, { mapsUrl: 'invalid_format' }],
     [
       'teks bertipe salah',
       { name: 1, tagline: true, address: 1, openingHours: false, mapsUrl: [], receiptFooter: {} },

@@ -104,7 +104,7 @@ cancel:
       sparepart (urut `partId` naik):
       - status `CANCELLED`, `cancelReason` = alasan (dipangkas), dan satu
         baris linimasa (status lama → `CANCELLED`, staf yang masuk, `note` =
-        alasan);
+        alasan yang sudah dipangkas, sama persis dengan `cancelReason`);
       - **semua part kembali ke stok**: untuk tiap sparepart di SPK ini,
         `stock` bertambah sebesar jumlah `quantity` item `PART`-nya yang
         masih ada (sama dengan −jumlah `quantity` kartu stok SPK itu untuk
@@ -178,7 +178,9 @@ items:
          (`unknown_reference`, `inactive_reference`).
       3. Di bawah kunci baris SPK: status bukan `QUEUED`, `IN_PROGRESS`,
          atau `WAITING_PARTS` → 409 `work_order_locked`.
-      4. SPK sudah punya 50 item → 422 `fields.items: too_many_items`.
+      4. SPK sudah punya 50 item → 422 `fields.items: too_many_items`. Ini
+         pengecualian dari urutan umum (422 sesudah 409 `work_order_locked`):
+         SPK terkunci yang sudah berisi 50 item tetap mendapat 409.
       5. `PART`: baris sparepart dikunci (`SELECT … FOR UPDATE`) dan
          dibaca ulang; sudah nonaktif → 422 `fields.partId:
          inactive_reference`; `stock` < `quantity` → 409
@@ -432,6 +434,7 @@ wa:
         di `wa_messages`. Penyedia WhatsApp tidak dipanggil di dalam
         transaksi.
       - Terkirim → 200 dengan rincian SPK (`wa.<jenis>.status` `sent`).
+        Mengirim pesan, berhasil atau gagal, tidak mengubah `updatedAt` SPK.
       - Gagal → 503 `wa_unavailable`; baris `failed` tetap tercatat,
         sehingga rincian SPK sesudahnya menampilkan status `failed`.
     security:
@@ -501,7 +504,8 @@ trackingLink:
       `GET /api/public/work-orders/{tokenLama}` langsung 404. Boleh di
       status apa pun. Tidak mengirim WhatsApp; kasir bisa mengirim tautan
       baru lewat `POST /api/work-orders/{number}/wa` dengan jenis
-      `work_order_created`. Tidak menulis linimasa.
+      `work_order_created`. Tidak menulis linimasa. `updatedAt` SPK
+      diperbarui (token lacak adalah bagian dari SPK).
     security:
       - tokenStaf: []
     parameters:

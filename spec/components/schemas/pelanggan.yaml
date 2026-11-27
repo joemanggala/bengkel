@@ -214,7 +214,8 @@ UbahPelangganRequest:
   type: object
   description: |
     Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
-    membalas 200 tanpa perubahan. Field yang dikirim diperiksa dengan aturan
+    membalas 200 tanpa perubahan apa pun, termasuk
+    `updatedAt`. Field yang dikirim diperiksa dengan aturan
     yang sama seperti saat membuat pelanggan; `null` pada `name` atau
     `phone` → `required`, `null` pada `address` atau `notes` →
     `invalid_type`. Field lain di badan diabaikan.
@@ -254,13 +255,15 @@ UbahKendaraanRequest:
   type: object
   description: |
     Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
-    membalas 200 tanpa perubahan. `null` pada `type`, `plate`, atau `brand`
+    membalas 200 tanpa perubahan apa pun, termasuk
+    `updatedAt`. `null` pada `type`, `plate`, atau `brand`
     → `required`; `null` pada `model` atau `color` → `invalid_type`; `null`
     pada `year` = mengosongkan tahun. Pemilik kendaraan tidak bisa diganti.
     Field lain di badan diabaikan.
   properties:
     type:
       type: string
+      description: '`MOTOR` atau `CAR`, dibandingkan persis (tidak dipangkas). Tidak dikirim = tidak berubah; `null` atau kosong → `required`; bukan string → `invalid_type`; nilai lain (termasuk `motor` dan `"  "`) → `invalid_format`.'
       enum: [MOTOR, CAR]
     plate:
       $ref: './umum.yaml#/PlatMasukan'

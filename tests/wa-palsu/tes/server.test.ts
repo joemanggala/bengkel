@@ -320,6 +320,18 @@ describe('mode gangguan untuk alasan gagal', () => {
     expect(res.body).toMatchObject({ status: false, reason: `token tidak dikenali: ${TOKEN}` });
     expect((await kendali('pesan')).body.data).toEqual([]);
   });
+
+  it('status-besar: HTTP 200 dengan "Status": false tanpa field status huruf kecil', async () => {
+    await kendali('gangguan', { gagal: true, nomor: NOMOR, mode: 'status-besar' });
+
+    const res = await kirim(form({ target: NOMOR, message: 'x' }));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ Status: false, reason: 'device disconnected', requestid: 1 });
+    expect('status' in res.body).toBe(false);
+    expect((await kendali('pesan')).body.data).toEqual([]);
+    expect((await kendali('permintaan')).body.data[0]).toMatchObject({ hasil: 'gangguan', alasan: 'gangguan status-besar', statusHttp: 200 });
+  });
 });
 
 describe('jeda', () => {
@@ -354,11 +366,29 @@ describe('jeda', () => {
     expect(Date.now() - lagi).toBeLessThan(1000);
   });
 
-  it('badan jeda tidak sah → 400', async () => {
+  it('badan jeda tidak sah → 400; jeda lebih dari 10 detik (batas waktu backend) sampai 15 detik boleh', async () => {
     expect((await kendali('jeda', {})).status).toBe(400);
     expect((await kendali('jeda', { ms: -1 })).status).toBe(400);
-    expect((await kendali('jeda', { ms: 5001 })).status).toBe(400);
+    expect((await kendali('jeda', { ms: 15_001 })).status).toBe(400);
     expect((await kendali('jeda', { ms: 10, nomor: '0812' })).status).toBe(400);
+    expect((await kendali('jeda', { ms: 15_000, nomor: NOMOR })).body.jeda).toEqual({ semua: 0, nomor: { [NOMOR]: 15_000 } });
+    expect((await kendali('jeda', { ms: 12_000 })).body.jeda).toEqual({ semua: 12_000, nomor: { [NOMOR]: 15_000 } });
+  });
+
+  it('pengirim yang menutup koneksi selama jeda (waktu habis): tercatat "ditinggal" dan pesannya tidak disimpan', async () => {
+    await kendali('jeda', { ms: 800, nomor: NOMOR });
+
+    const galat = await fetch(`${hidup.alamat}/send`, {
+      method: 'POST',
+      headers: { Authorization: TOKEN },
+      body: form({ target: NOMOR, message: 'ditinggal' }),
+      signal: AbortSignal.timeout(200),
+    }).catch((g: unknown) => g);
+    expect(galat).toBeInstanceOf(Error);
+    await new Promise((r) => setTimeout(r, 900));
+
+    expect((await kendali('permintaan')).body.data[0]).toMatchObject({ hasil: 'ditinggal', statusHttp: null, field: { target: [NOMOR] } });
+    expect((await kendali('pesan')).body.data).toEqual([]);
   });
 });
 

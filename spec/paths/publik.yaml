@@ -41,7 +41,7 @@ bookings:
     description: |
       Publik. Urutan: 413 → 400 → 422 → 409 `too_many_pending_bookings` →
       201. Rute publik tidak memeriksa `Authorization` sama sekali, jadi
-      tidak ada 401 dan 403.
+      tidak pernah membalas 401 `unauthenticated` atau 403 `forbidden`.
 
       Setelah validasi lolos, dalam **satu transaksi**:
       1. Baris `counters` `booking_number` dikunci (`SELECT … FOR UPDATE`).
@@ -164,9 +164,10 @@ bookingCancel:
     tags: [Publik]
     summary: Pelanggan membatalkan bookingnya selagi menunggu
     description: |
-      Publik. Tanpa badan (badan diabaikan, termasuk JSON rusak). Urutan:
-      404 → 409 `booking_transition_invalid` → 200 dengan booking sesudah
-      dibatalkan.
+      Publik. Tanpa badan: badan apa pun diabaikan sepenuhnya, termasuk JSON
+      rusak dan badan lebih dari 1 MiB (tidak ada 400 dan 413, sama dengan
+      rute staf tanpa badan). Urutan: 404 → 409 `booking_transition_invalid`
+      → 200 dengan booking sesudah dibatalkan.
 
       - Hanya booking `PENDING` yang bisa dibatalkan pelanggan; status lain,
         termasuk yang sudah `CANCELLED` atau `CONFIRMED`, → 409

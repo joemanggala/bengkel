@@ -65,9 +65,9 @@ export async function stafDb(staffId: string): Promise<{ role: string; aktif: bo
   return { role: baris.role, aktif: Boolean(baris.is_active), name: baris.name, email: baris.email };
 }
 
-// JSON dengan objek bersarang `tingkat` lapis, untuk aturan "bersarang lebih
-// dari 64 tingkat → 400". Dipakai 65 lapis objek, yang lebih dari 64 apa pun
-// cara menghitungnya (dengan atau tanpa nilai daun).
+// JSON dengan objek bersarang `tingkat` lapis (`{"a":{"a":…1}}`), untuk aturan "bersarang lebih
+// dari 64 tingkat → 400". Tingkat = jumlah objek yang saling membungkus; nilai
+// daun 1 tidak dihitung, jadi jsonBersarang(64) sah dan jsonBersarang(65) → 400.
 export function jsonBersarang(tingkat: number): string {
   return `${'{"a":'.repeat(tingkat)}1${'}'.repeat(tingkat)}`;
 }

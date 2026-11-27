@@ -196,6 +196,8 @@ describe('PATCH /api/work-orders/{number}: validasi', () => {
     ['estimatedDoneAt 4 digit pecahan', { estimatedDoneAt: '2026-11-28T08:00:00.1234Z' }, { estimatedDoneAt: 'invalid_format' }],
     ['estimatedDoneAt sebelum 2000 (UTC)', { estimatedDoneAt: '2000-01-01T06:59:59+07:00' }, { estimatedDoneAt: 'out_of_range' }],
     ['estimatedDoneAt larik', { estimatedDoneAt: [] }, { estimatedDoneAt: 'invalid_type' }],
+    ['estimatedDoneAt string kosong (bukan pengosong; pakai null)', { estimatedDoneAt: '' }, { estimatedDoneAt: 'invalid_format' }],
+    ['estimatedDoneAt tahun 0000', { estimatedDoneAt: '0000-06-15T12:00:00+07:00' }, { estimatedDoneAt: 'out_of_range' }],
     ['mechanicId kosong', { mechanicId: '' }, { mechanicId: 'required' }],
     ['mechanicId angka', { mechanicId: 1 }, { mechanicId: 'invalid_type' }],
     ['mechanicId bukan UUID', { mechanicId: 'andi' }, { mechanicId: 'invalid_format' }],

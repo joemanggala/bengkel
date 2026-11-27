@@ -132,6 +132,7 @@ Booking:
     updatedAt:
       type: string
       format: date-time
+      description: Berubah setiap kali status booking berubah (konfirmasi, tolak, jadi SPK, batal oleh pelanggan); pengiriman WhatsApp tidak mengubahnya.
 
 BookingPublik:
   type: object
@@ -214,7 +215,8 @@ BuatBookingRequest:
     Form booking publik. Field lain di badan diabaikan. Semua field
     diperiksa sekaligus, termasuk rujukan `serviceId` (hanya bila formatnya
     sah). Teks dari form publik tidak boleh memuat karakter kontrol (lihat
-    "Teks" di deskripsi API).
+    "Teks" di deskripsi API). `null` pada field wajib, termasuk `phone` dan
+    `plate`, → `required` (bukan `invalid_type`).
   required: [customerName, phone, vehicleType, plate, vehicleBrand, visitDate, complaint]
   properties:
     customerName:
@@ -257,11 +259,14 @@ BuatBookingRequest:
     visitDate:
       type: string
       description: |
-        Tanggal datang `YYYY-MM-DD`. Tidak dikirim, `null`, atau kosong →
-        `required`; bukan string → `invalid_type`; tidak cocok pola atau
-        tidak ada di kalender (mis. `2026-02-30`) → `invalid_format`;
-        sebelum hari ini atau lebih dari 30 hari sesudah hari ini menurut
-        tanggal WIB saat permintaan diterima → `out_of_range`. Contoh: pada
+        Tanggal datang `YYYY-MM-DD`. **Tidak dipangkas.** Tidak dikirim,
+        `null`, atau string kosong `""` → `required`; bukan string →
+        `invalid_type`; tidak cocok pola (termasuk spasi di mana pun, mis.
+        `"  "` atau `" 2026-11-28"`) atau tidak ada di kalender (mis.
+        `2026-02-30`) → `invalid_format`; sebelum hari ini atau lebih dari 30
+        hari sesudah hari ini menurut tanggal WIB saat permintaan diterima →
+        `out_of_range`. Kalender Gregorian proleptik, jadi tahun `0000` ada
+        dan `0000-01-01` → `out_of_range`, bukan `invalid_format`. Contoh: pada
         27-11-2026 pukul 23.30 WIB yang sah `2026-11-27` sampai
         `2026-12-27`; pada 27-11-2026 pukul 17.30 UTC (= 28-11-2026 00.30
         WIB) yang sah `2026-11-28` sampai `2026-12-28`.

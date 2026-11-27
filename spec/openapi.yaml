@@ -70,15 +70,27 @@ info:
       → 404 (sumber di path) → 403 (kepemilikan SPK oleh mekanik, hanya di
       rute SPK yang boleh dipanggil mekanik) → 422 → 409. Jadi JSON rusak
       tanpa token → 400, dan kasir yang mengirim JSON sah ke rute pemilik →
-      403.
+      403. Pengecualian yang tertulis di deskripsi operasinya: 422 yang
+      baru bisa dinilai di bawah kunci baris sesudah 409 tertentu, yaitu
+      `fields.items: too_many_items` dan `fields.partId: inactive_reference`
+      saat menambah item SPK (sesudah 409 `work_order_locked`) dan
+      `fields.amount: out_of_range` saat membayar melebihi sisa (sesudah 409
+      `work_order_cancelled`/`already_picked_up`).
     - Rute staf tanpa badan: 401 → 403 (peran) → 404 → 403 (kepemilikan SPK)
       → 422 (query) → langkah operasi. Badan yang dikirim ke rute ini
       **diabaikan sepenuhnya**, termasuk JSON rusak: tidak ada 400 dan tidak
       ada 413 (mis. `POST /api/staff/logout` dengan badan `{` tetap 204).
     - "Badan bukan objek JSON" (→ 400) mencakup badan kosong, `null`, larik,
       string, angka, dan boolean; hanya objek JSON `{…}` yang lolos.
-    - Rute publik: 413 → 400 → 404 (token di path) → 422 → 409. Tidak ada
-      401 dan 403, karena rute publik tidak memeriksa `Authorization`.
+    - Rute publik dengan badan JSON: 413 → 400 → 404 (token di path) → 422
+      → 409. Rute publik tanpa badan (`GET /api/public/…` dan
+      `POST /api/public/bookings/{bookingToken}/cancel`) mengabaikan badan
+      sepenuhnya seperti rute staf tanpa badan: tidak ada 413 dan tidak ada
+      400. Rute publik tidak pernah membalas 401 `unauthenticated` atau 403
+      `forbidden`, karena tidak memeriksa `Authorization`. (`POST
+      /api/setup` dan `POST /api/staff/login` punya 401/403 dengan kodenya
+      sendiri: `invalid_credentials`, `setup_disabled`,
+      `setup_token_invalid`.)
 
     ## Peran dan sesi
 
@@ -111,11 +123,16 @@ info:
       sepenuhnya, termasuk token yang tidak sah.
     - Tanpa header, skema lain, token kosong, token tak dikenal, sesi lewat
       `expires_at`, atau staf yang sudah nonaktif → 401 `unauthenticated`.
-    - Setiap permintaan terautentikasi yang lolos memperpanjang `expires_at`
-      menjadi sekarang + 30 hari dan memperbarui `last_used_at`. Penulisan
-      keduanya boleh dibatasi paling sering sekali per 5 menit (tulis bila
-      `last_used_at` lebih dari 5 menit lalu). Tes hanya memeriksa
-      perpanjangan untuk sesi yang `last_used_at`-nya sudah satu jam lalu.
+    - Setiap permintaan yang **lolos autentikasi** (token dikenal, sesi
+      belum lewat, staf aktif) memperpanjang `expires_at` menjadi sekarang
+      + 30 hari dan memperbarui `last_used_at`, apa pun balasan akhirnya:
+      permintaan yang sesudah autentikasi ditolak 403, 404, 422, atau 409
+      juga memperpanjang sesi. Permintaan yang dibalas 401, dan permintaan
+      yang ditolak sebelum autentikasi (rute tak dikenal, 413, 400 di rute
+      berbadan), tidak menyentuh sesi. Penulisan keduanya boleh dibatasi
+      paling sering sekali per 5 menit (tulis bila `last_used_at` lebih dari
+      5 menit lalu). Tes hanya memeriksa perpanjangan untuk sesi yang
+      `last_used_at`-nya sudah satu jam lalu.
     - Peran staf dibaca dari database pada setiap permintaan, jadi perubahan
       peran langsung berlaku. Matriks izin (✓ = boleh, selain itu 403
       `forbidden`):
@@ -141,7 +158,15 @@ info:
       mekanik hanya boleh mengirim `diagnosis` (kunci lain → 403). Di
       `status` mekanik hanya boleh menuju `IN_PROGRESS`, `WAITING_PARTS`,
       atau `DONE` (`PICKED_UP` → 403, dinilai sesudah 422). Item, pembayaran,
-      pembatalan, dan WhatsApp tetap di kasir.
+      pembatalan, dan WhatsApp tetap di kasir. Rincian SPK milik mekanik
+      sama persis dengan yang diterima kasir, **termasuk `trackingToken`**:
+      token itu hanya membuka halaman lacak pelanggan (hanya baca) untuk SPK
+      yang memang dikerjakan mekanik itu, jadi tidak membuka apa pun yang
+      belum boleh ia lihat.
+    - **Nama staf selalu nama saat ini.** `StafRingkas` di mana pun
+      (mekanik dan pembuat SPK, staf di linimasa, pembayaran, kartu stok,
+      booking, dan rekap) dibaca dari tabel `staff` saat respons disusun,
+      bukan salinan. Mengganti nama staf langsung terlihat di SPK lama.
     - **Harga beli (modal) adalah rahasia pemilik.** `costPrice` hanya ada di
       sparepart bila yang meminta pemilik (`SparepartPemilik`); untuk kasir
       dan mekanik kuncinya **tidak ada sama sekali** (`SparepartStaf`:
@@ -160,7 +185,7 @@ info:
     | Token | Diberikan | Membuka | Disimpan sebagai |
     |---|---|---|---|
     | `bookingToken` | **sekali**, di balasan `POST /api/public/bookings` | melihat dan membatalkan **satu booking** itu | hash SHA-256 (`bookings.booking_token_hash`) |
-    | `trackingToken` | di tautan pesan WhatsApp SPK dan di rincian SPK untuk staf | melihat status dan nota **satu SPK** itu (hanya baca) | apa adanya (`work_orders.tracking_token`), bisa dibuat ulang kasir |
+    | `trackingToken` | di tautan pesan WhatsApp SPK dan di rincian SPK untuk staf (termasuk mekanik SPK itu) | melihat status dan nota **satu SPK** itu (hanya baca) | apa adanya (`work_orders.tracking_token`), bisa dibuat ulang kasir |
 
     - Form booking bisa diisi siapa saja; karena itu booking mulai
       `PENDING` dan **harus diterima staf**, paling banyak **3 booking
@@ -234,7 +259,11 @@ info:
     - Badan JSON yang memuat byte UTF-8 tidak sah, surrogat tunggal dalam
       escape (`\ud800` tanpa pasangan), atau bersarang lebih dari 64 tingkat
       → 400 `bad_request`, sama dengan JSON rusak. Teks tidak boleh diam-diam
-      diganti U+FFFD.
+      diganti U+FFFD. **Tingkat** = jumlah objek atau larik yang saling
+      membungkus, dihitung dari badan itu sendiri; nilai skalar tidak
+      menambah tingkat. Jadi `{}` dan `{"a":1}` 1 tingkat, `{"a":[1]}` 2
+      tingkat; 64 tingkat masih sah (lalu dinilai seperti biasa), 65 tingkat
+      → 400.
 
     ## Teks
 
@@ -248,6 +277,11 @@ info:
     - Field pilihan tetap (`role`, `type`, `status`, `method`, `vehicleType`,
       dan sejenisnya) **tidak** dipangkas: string kosong `""` → `required`,
       sedangkan `"  "` bukan kosong sehingga → `invalid_format`.
+    - Field berbentuk tetap di badan, yaitu UUID (`UuidMasukan`), tanggal
+      (`visitDate`), dan waktu (`WaktuMasukan`), juga **tidak** dipangkas:
+      spasi di mana pun, termasuk `"  "` dan UUID sah yang diapit spasi, →
+      `invalid_format`. Arti string kosong `""` tertulis di field
+      masing-masing.
     - Pola regex dan pilihan enum dicocokkan peka huruf, terhadap seluruh
       string: `$` berarti akhir string yang sebenarnya, jadi `"S-0001\n"`
       tidak cocok dengan `^S-[0-9]{4,}$` (di PHP pakai `\z` atau pengubah `D`).
@@ -272,7 +306,8 @@ info:
       2–12 karakter A-Z/0-9, diawali huruf (`b 1234-xyz` → `B1234XYZ`);
       tampilan = huruf depan, angka, huruf belakang dipisah satu spasi
       (`B 1234 XYZ`), atau kunci apa adanya bila tidak mengikuti pola itu.
-      Aturan lengkap dan contohnya ada di skema `PlatMasukan`. Satu kunci
+      Aturan lengkap dan contohnya ada di skema `PlatMasukan`. Plat di pesan
+      WhatsApp, halaman publik, dan nota selalu bentuk tampilan ini. Satu kunci
       plat hanya milik satu kendaraan dan satu kendaraan hanya milik satu
       pelanggan (409 `plate_taken`). Pencarian plat memakai kunci, jadi
       `b1234` menemukan `B 1234 XYZ`.
@@ -384,6 +419,17 @@ info:
       `date`, batas tanggal datang booking) memakai WIB = UTC+7 tetap, tanpa
       basis data zona waktu. `visit_date` booking disimpan sebagai `DATE`
       WIB apa adanya.
+    - **`updatedAt`.** `PATCH` yang tidak memuat satu pun field yang
+      dikenal (`{}`, atau hanya field yang diabaikan) tidak menulis apa pun,
+      jadi `updatedAt` pelanggan, kendaraan, jasa, sparepart, dan SPK
+      **tidak berubah**. `PATCH` yang memuat field yang dikenal memperbarui
+      `updatedAt`; bila semua nilainya sama dengan yang tersimpan, boleh
+      diperbarui atau tidak (tidak diuji). `updatedAt` SPK juga diperbarui
+      oleh item, status, pembatalan, pembayaran, dan pembuatan ulang tautan
+      lacak, tetapi **tidak** oleh pengiriman WhatsApp (pesan dicatat di
+      tabelnya sendiri). `updatedAt` booking diperbarui setiap statusnya
+      berubah (konfirmasi, tolak, jadi SPK, batal oleh pelanggan), tetapi
+      tidak oleh pengiriman WhatsApp.
 
     ## Urutan bawaan daftar
 

@@ -182,8 +182,9 @@ export async function gantiHashToken(nomor: string, token: string): Promise<void
   }
 }
 
-// Badan JSON bersarang `tingkat` lapis di field yang tidak dikenal (field
-// lain di badan diabaikan, jadi hanya kedalamannya yang dinilai).
+// Badan JSON dengan `tingkat` larik bersarang di field yang tidak dikenal (field
+// lain di badan diabaikan, jadi hanya kedalamannya yang dinilai). Ditambah objek
+// badan itu sendiri, kedalaman totalnya `tingkat` + 1.
 export function badanBersarang(isian: Record<string, unknown>, tingkat: number): string {
   const json = JSON.stringify(isian);
   return `${json.slice(0, -1)},"lain":${'['.repeat(tingkat)}${']'.repeat(tingkat)}}`;

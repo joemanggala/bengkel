@@ -19,12 +19,12 @@ export interface CatatanPermintaanWa {
   contentType: string | null;
   field: Record<string, string[]> | null;
   fieldBerkas: string[];
-  hasil: 'diproses' | 'terkirim' | 'ditolak' | 'gangguan';
+  hasil: 'diproses' | 'terkirim' | 'ditolak' | 'gangguan' | 'ditinggal';
   alasan: string | null;
   statusHttp: number | null;
 }
 
-export type ModeGangguanWa = 'status-false' | 'http-500' | 'putus' | 'alasan-panjang' | 'gema-token';
+export type ModeGangguanWa = 'status-false' | 'http-500' | 'putus' | 'alasan-panjang' | 'gema-token' | 'status-besar';
 
 async function kendali(path: string, badan?: unknown): Promise<any> {
   const { waPalsuUrl } = bacaEnv();
@@ -61,7 +61,9 @@ export const waPalsu = {
     return pesan;
   },
   permintaan: async (): Promise<CatatanPermintaanWa[]> => (await kendali('permintaan')).data,
-  // Menahan balasan /send selama ms (0..5000) untuk satu nomor atau semua.
+  // Menahan balasan /send selama ms (0..15000) untuk satu nomor atau semua.
+  // Lebih dari 10000 = melewati batas waktu backend (permintaan yang ditinggal
+  // backend tercatat "ditinggal" dan pesannya tidak disimpan).
   // Dipakai tes serentak supaya backend pasti sedang menunggu penyedia
   // WhatsApp saat permintaan lain datang.
   jeda: async (ms: number, nomor?: string): Promise<void> => {

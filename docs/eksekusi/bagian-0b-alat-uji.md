@@ -210,3 +210,91 @@ pengalihan), `bentukNotFound(res)` + `NOT_FOUND_JSON`, `JSON_RUSAK`, `jsonLebihD
   terbaca.
 - Kasus mekanik: buat SPK dengan `mechanicId: b.mekanik.staff.staffId`; SPK tanpa mekanik yang
   dibuka mekanik → 403.
+
+## Perubahan spek selama 0b (perjelasan, 2026-11-27)
+
+Ambiguitas yang ditemukan lima penulis tes dan pelaksana Laravel, diputuskan pemilik spec dan tes
+kontrak (Bagian 0). Diperjelas, bukan diubah maknanya, kecuali `mapsUrl` (kini hanya ASCII
+terlihat) dan WhatsApp palsu (mode dan jeda baru). Preseden kafe-resto/laundry diikuti bila ada.
+Jumlah tes kontrak naik 2.084 → 2.149 (+65); `tests/wa-palsu` 37 → 39.
+
+**Keputusan koordinator (pasti):**
+
+- Mekanik **boleh** menerima `trackingToken` di rincian SPK miliknya (rincian sama persis dengan
+  kasir; token hanya membuka halaman lacak). Ditulis di "Batas mekanik", tabel "Pelanggan tanpa
+  akun", dan `SpkDetail`. Tes: `spk-baru` (rincian mekanik memuat token tersimpan).
+- Tahun `0000` di `visitDate` dan `WaktuMasukan` → `out_of_range` (kalender Gregorian proleptik,
+  jadi tahun 0000 ada). `?plate=` menilai format sebelum panjang. Term pencarian berawalan `+`
+  selain `+62` tidak pernah cocok dengan nomor HP. `estimatedDoneAt: ""` → `invalid_format`. UUID
+  di badan tidak dipangkas; `"  "` → `invalid_format`.
+
+**Per butir:**
+
+1. **Batas masuk, email non-ASCII**: dihitung dan dikunci seperti email lain (langkah 3 tetap
+   berjalan; "tanpa bertanya ke database" di langkah 4 hanya berarti tidak mencari staf). Tes:
+   `staf-auth-2`.
+2. **Sesi bergeser**: setiap permintaan yang **lolos autentikasi** memperpanjang sesi, termasuk
+   yang lalu dibalas 403/404/422/409; 401 dan penolakan sebelum autentikasi (rute tak dikenal,
+   413, 400) tidak menyentuh sesi. Tes: `staf-auth-2`.
+3. **`mapsUrl`**: `^https?://[\x21-\x7E]+$`, hanya ASCII terlihat, ditulis dengan rentang kode
+   (bukan `\s`) supaya sama di PCRE/JS/Go; huruf beraksen, NBSP, U+2028, U+3000, DEL ditolak.
+   Tes: `outlet`.
+4. **Kedalaman JSON**: tingkat = objek/larik yang saling membungkus (skalar tidak dihitung);
+   64 sah, 65 → 400. Tes: `staf-auth` (64 → 422, 65 → 400), `booking-publik` (64 → 201, 65 → 400).
+5. **Login bersandi benar serentak di dekat batas**: tidak ditentukan dan tidak diuji (ditulis di
+   langkah 3 `masukStaf`).
+6. **Nama staf**: `StafRingkas` di mana pun = nama **saat ini** (tidak ada salinan di
+   database). Mengganti `name`/`email` staf **tidak** mengakhiri sesi; hanya `password` dan
+   `isActive: false`. `tagline` boleh memuat pergantian baris (tidak diperiksa, seperti `name`).
+   Tes: `kelola-staf-3`, `outlet`.
+7. **`PATCH` tanpa field yang dikenal** (pelanggan, kendaraan, jasa, sparepart, SPK) tidak
+   mengubah `updatedAt`; tidak ada preseden, jadi diputuskan "tidak menulis apa pun". PATCH
+   dengan field dikenal memperbaruinya; nilai sama dengan yang tersimpan tidak ditentukan. Tes:
+   `waktu-ubah` (baru).
+8. **`note` linimasa batal** = alasan yang sudah dipangkas, sama dengan `cancelReason`. Tes sudah
+   ada: `batal-spk`.
+9. **Urutan tambah item**: `too_many_items` dan `partId: inactive_reference` (422) sesudah 409
+   `work_order_locked`, juga `amount: out_of_range` pembayaran sesudah 409; disebut sebagai
+   pengecualian di "Urutan pemeriksaan" global. Tes sudah ada: `item-spk-2`, `pembayaran`.
+10. **`UbahKendaraanRequest.type`**: deskripsi kode galat disalin (`null`/kosong → `required`,
+    `motor` dan `"  "` → `invalid_format`). Tes: `kendaraan`.
+11. **`PergerakanStok.staff`**: `USED` = staf yang menambah item; `RETURNED` = staf yang menghapus
+    item atau membatalkan SPK. Tes sudah ada: `stok-kartu`, `batal-spk`.
+12. **Pencarian non-ASCII** tidak pernah cocok dengan SKU (dan dengan nomor SPK/booking, preseden
+    kafe-resto/laundry), tetapi tetap bisa cocok dengan nama; tidak boleh menjadi galat collation.
+    Tes: `sparepart-daftar`, `daftar-spk`.
+13. **`null` pada `phone` dan `plate`** di field wajib → `required` (aturan umum "Tipe JSON"),
+    bukan `invalid_type`; langkah 1 `NomorHpMasukan`/`PlatMasukan` diperjelas. Tes:
+    `booking-publik-validasi` (yang lain sudah: `pelanggan`, `kendaraan`).
+14. **`visitDate` tidak dipangkas**; spasi di mana pun → `invalid_format`, `""` tetap `required`.
+    Ditambah bullet umum di "Teks": UUID, tanggal, dan waktu tidak dipangkas. Tes:
+    `booking-publik-validasi`.
+15. **Rute publik tanpa badan** (`GET …`, batal booking) mengabaikan badan: tidak ada 413 dan 400.
+    Tes: `booking-publik`.
+16. **Konversi booking yang tanggal datangnya sudah lewat** (atau masih jauh): boleh, tanggal tidak
+    diperiksa saat konversi. Tes: `konversi-booking`.
+17. **`updatedAt`**: booking berubah setiap statusnya berubah (konfirmasi, tolak, jadi SPK, batal);
+    `POST …/tracking-link` **memperbarui** `updatedAt` SPK; pengiriman WhatsApp (otomatis atau
+    kirim ulang) tidak mengubah `updatedAt` SPK maupun booking. Ditulis di bagian "Waktu". Tes:
+    `waktu-ubah`.
+18. "Rute publik: tidak ada 401 dan 403" → "tidak pernah 401 `unauthenticated` atau 403
+    `forbidden`" (setup dan login punya 401/403 dengan kodenya sendiri), di deskripsi API dan
+    `buatBookingPublik`. Tes sudah ada (`setup`, `booking-publik`, `publik-lacak`).
+19. **`whatsapp.md` bagian 3**: "plat (huruf dan angka saja)" → plat bentuk tampilan
+    (`PlatTampilan`, bagian 4). Deskripsi API menyebut plat di pesan/halaman publik/nota selalu
+    bentuk tampilan. Tes sudah ada (`wa-otomatis`, isi pesan huruf demi huruf).
+20. **`SpkPublik.customerName`/`customerPhone`/`vehicle`** dan
+    **`RekapHarian.doneByMechanic[].mechanic`**: data saat ini (rekap tanggal lampau juga, urut
+    nama saat ini). Tes: `publik-lacak`, `rekap`.
+21. **WhatsApp palsu**: mode gangguan `status-besar` (`{"Status": false, "reason": …}` tanpa
+    `status`), jeda sampai 15 detik (sebelumnya 5), dan hasil permintaan baru `ditinggal` bila
+    pengirim menutup koneksi selama jeda (pesan tidak disimpan). Tes palsu: `tests/wa-palsu`
+    (+2). Tes kontrak: `kirim-wa` (503 untuk `status-besar`, alasan dari `reason`) dan
+    `wa-batas-waktu` (baru: penyedia diam 12 detik → kirim ulang 503 dan SPK baru 201 dengan
+    `failed` sesudah ±10 detik, koneksi ditutup; balasan 8 detik tetap ditunggu). `whatsapp.md`
+    bagian 2 memperjelas "batas waktu 10 detik" (balasan sebelum 10 detik wajib ditunggu).
+
+Catatan untuk pelaksana backend: `wa-batas-waktu.test.ts` lambat (±35 detik) dan memakai jeda 8–12
+detik per nomor. WhatsApp palsu yang sudah menyala sebelum perubahan ini (mis. proses terpisah
+di 8892) harus dinyalakan ulang supaya mengenal mode `status-besar` dan jeda di atas 5 detik;
+yang dinyalakan harness sendiri otomatis memakai kode baru.

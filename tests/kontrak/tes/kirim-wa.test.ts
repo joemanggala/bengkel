@@ -347,6 +347,7 @@ describe('POST /api/work-orders/{number}/wa: urutan 413 → 400 → 401 → 403 
 function alasanHarapan(mode: ModeGangguanWa): string | undefined {
   switch (mode) {
     case 'status-false':
+    case 'status-besar':
       return 'device disconnected';
     case 'gema-token':
       return 'token tidak dikenali: ***';
@@ -376,6 +377,7 @@ describe('POST /api/work-orders/{number}/wa: gagal kirim → 503 wa_unavailable'
     ['koneksi putus', 'putus'],
     ['alasan 600 huruf non-ASCII, dipotong 255 code point', 'alasan-panjang'],
     ['alasan memuat ulang token, disamarkan', 'gema-token'],
+    ['"Status": false huruf besar tanpa status (HTTP 200)', 'status-besar'],
   ])('nota gagal (%s): 503, baris failed tercatat dengan isi pesan, rincian menampilkan failed, token tidak bocor', async (_nama, mode) => {
     const { nomorHp, spk } = await spkDi();
     await waPalsu.gangguan({ gagal: true, nomor: nomorHp, mode });

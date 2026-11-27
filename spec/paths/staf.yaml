@@ -134,6 +134,11 @@ staff:
         Mekanik yang diubah menjadi kasir tetap tertera di SPK lamanya.
       - `email` diubah ke nilai yang sama dengan miliknya sendiri bukan
         bentrok.
+      - Mengubah `name` atau `email` **tidak** mengakhiri sesi mana pun;
+        sesi staf itu tetap berlaku dan `GET /api/staff/me` langsung
+        membalas nilai barunya. Masuk berikutnya memakai email baru. Nama
+        baru langsung terlihat di semua `StafRingkas`, termasuk di SPK lama.
+        Hanya `password` dan `isActive: false` yang menghapus sesi.
 
       **Serentak.** Pemeriksaan 409 dan perubahan berada dalam satu
       transaksi yang lebih dulu mengunci baris `outlet` (`SELECT … FOR

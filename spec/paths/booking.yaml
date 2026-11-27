@@ -207,6 +207,11 @@ convert:
       `booking_transition_invalid` (status bukan `PENDING` atau
       `CONFIRMED`) → 409 `plate_owned_by_other_customer` → 201.
 
+      Tanggal datang **tidak** diperiksa saat konversi: booking yang
+      tanggal datangnya sudah lewat (pelanggan datang terlambat) atau belum
+      tiba (datang lebih awal) tetap bisa dijadikan SPK. Batas "hari ini
+      sampai 30 hari" hanya berlaku saat booking dibuat.
+
       Dalam **satu transaksi**, dengan urutan kunci baris booking →
       pelanggan → kendaraan → `counters` (lihat "Permintaan serentak"):
       1. Baris booking dikunci dan statusnya diperiksa (409).

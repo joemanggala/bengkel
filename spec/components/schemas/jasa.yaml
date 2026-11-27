@@ -137,7 +137,8 @@ UbahJasaRequest:
   type: object
   description: |
     Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
-    membalas 200 tanpa perubahan. `null` pada `name` atau `price` →
+    membalas 200 tanpa perubahan apa pun, termasuk
+    `updatedAt`. `null` pada `name` atau `price` →
     `required`; `null` pada `durationMinutes` = mengosongkan durasi; `null`
     pada field lain → `invalid_type`. Mengubah nama atau harga tidak mengubah
     SPK dan booking yang sudah ada (nama dan harga disalin). Field lain di

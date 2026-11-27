@@ -347,6 +347,22 @@ describe('GET /api/reports/daily: modal, laba negatif, dan terlaris', () => {
     expect(r.doneCount).toBe(5);
   });
 
+  it('nama mekanik di rekap tanggal lampau adalah nama saat ini, dan urutannya memakai nama itu', async () => {
+    const jasa = await buatJasa(b.pemilik.token, { name: namaUnik('Jasa Ganti Nama'), price: 10_000 });
+    const zaenal = await buatMekanik({ name: 'Zaenal Lama' });
+    const yoga = await buatMekanik({ name: 'Yoga Mekanik' });
+    for (const m of [zaenal, yoga]) {
+      await susun({ mekanik: m, item: [{ jasa, qty: 1 }], dibuat: '2026-04-05T01:00:00.000Z', selesai: '2026-04-05T02:00:00.000Z' });
+    }
+
+    wajib(await api.patch(`/api/staff/${zaenal.staff.staffId}`, { token: b.pemilik.token, json: { name: 'Ahmad Zaenal' } }), 200);
+
+    expect((await rekap('2026-04-05')).doneByMechanic).toEqual([
+      { mechanic: { staffId: zaenal.staff.staffId, name: 'Ahmad Zaenal' }, doneCount: 1 },
+      { mechanic: ringkasStaf(yoga), doneCount: 1 },
+    ]);
+  });
+
   it('SPK yang dibatalkan dengan item part tidak menyumbang nilai, modal, maupun terlaris; hanya cancelledCount', async () => {
     const part = await buatPart(b.pemilik.token, { name: namaUnik('Part Batal'), costPrice: 0, initialStock: 5 });
     await susun({ item: [{ part, qty: 2 }], dibuat: '2026-04-04T01:00:00.000Z', batal: '2026-04-04T02:00:00.000Z' });

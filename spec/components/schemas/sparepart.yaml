@@ -211,7 +211,8 @@ UbahSparepartRequest:
   type: object
   description: |
     Perubahan sebagian: field yang tidak dikirim tidak berubah, dan `{}`
-    membalas 200 tanpa perubahan. `null` pada `sku`, `name`, `unit`, atau
+    membalas 200 tanpa perubahan apa pun, termasuk
+    `updatedAt`. `null` pada `sku`, `name`, `unit`, atau
     `price` → `required`; `null` pada `costPrice`, `minStock`, atau
     `isActive` → `invalid_type`. **Stok tidak bisa diubah di sini**, hanya
     lewat `stock-in`, `stock-out`, `stock-count`, dan item SPK: field
@@ -334,7 +335,13 @@ PergerakanStok:
         - $ref: './spk.yaml#/NomorSpk'
         - type: 'null'
     staff:
-      $ref: './staf.yaml#/StafRingkas'
+      allOf:
+        - $ref: './staf.yaml#/StafRingkas'
+      description: |
+        Staf yang menyebabkan baris ini: yang mencatat stok masuk, keluar,
+        hitung ulang, atau membuat sparepart (stok awal); untuk `USED` staf
+        yang menambah item part; untuk `RETURNED` staf yang menghapus item
+        itu atau yang membatalkan SPK (bukan staf yang dulu menambahkannya).
     createdAt:
       type: string
       format: date-time

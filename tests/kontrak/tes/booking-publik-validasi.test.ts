@@ -157,6 +157,7 @@ describe('customerName', () => {
 
 describe('phone (NomorHpMasukan)', () => {
   it.each<[string, unknown, string]>([
+    ['null (field wajib, bukan invalid_type)', null, 'required'],
     ['kosong', '', 'required'],
     ['hanya spasi dan tanda hubung', ' - - ', 'required'],
     ['angka JSON', 81234567890, 'invalid_type'],
@@ -205,6 +206,7 @@ describe('vehicleType', () => {
 
 describe('plate (PlatMasukan)', () => {
   it.each<[string, unknown, string]>([
+    ['null (field wajib, bukan invalid_type)', null, 'required'],
     ['kosong', '', 'required'],
     ['hanya spasi, tanda hubung, titik', ' -. ', 'required'],
     ['angka JSON', 1234, 'invalid_type'],
@@ -265,6 +267,8 @@ describe('vehicleBrand dan vehicleModel', () => {
 describe('serviceId', () => {
   it.each<[string, () => unknown, string]>([
     ['kosong', () => '', 'required'],
+    ['hanya spasi (UUID tidak dipangkas)', () => '  ', 'invalid_format'],
+    ['UUID sah diapit spasi', () => ` ${b.gantiOli.serviceId} `, 'invalid_format'],
     ['angka', () => 5, 'invalid_type'],
     ['bukan UUID', () => 'ganti-oli', 'invalid_format'],
     ['UUID huruf besar', () => b.gantiOli.serviceId.toUpperCase(), 'invalid_format'],
@@ -325,6 +329,10 @@ describe('visitDate: hari ini sampai 30 hari ke depan menurut tanggal WIB', () =
     ['dengan jam', (t) => `${t}-12-01T00:00:00`, 'invalid_format'],
     ['30 Februari (format dinilai sebelum rentang)', (t) => `${t + 1}-02-30`, 'invalid_format'],
     ['bulan 13', (t) => `${t}-13-01`, 'invalid_format'],
+    ['hanya spasi (tidak dipangkas, bukan kosong)', () => '  ', 'invalid_format'],
+    ['spasi di depan', (t) => ` ${t}-12-01`, 'invalid_format'],
+    ['LF di akhir', (t) => `${t}-12-01\n`, 'invalid_format'],
+    ['tahun 0000 (ada di kalender Gregorian proleptik)', () => '0000-01-01', 'out_of_range'],
   ])('%s → %s', async (_nama, nilai, kode) => {
     const tahun = Number((await tanggalWibAman()).slice(0, 4));
     await harapTolak({ visitDate: nilai(tahun) }, { visitDate: kode });

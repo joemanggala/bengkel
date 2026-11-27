@@ -270,6 +270,9 @@ describe('GET /api/work-orders: pencarian nomor, plat, nama, dan nomor HP', () =
     ['tidak cocok apa pun', 'tidakada', []],
     ['% dicocokkan apa adanya', '%', []],
     ['_ dicocokkan apa adanya', '_', []],
+    ['nomor dengan huruf lebar penuh (non-ASCII) tidak pernah cocok', 'Ｓ-0001', []],
+    ['nomor dengan aksen (non-ASCII) tidak pernah cocok', 'š-0002', []],
+    ['HP berawalan + selain +62 tidak pernah cocok', '+85711112222', []],
   ])('%s (%s)', async (_nama, search, harapan) => {
     // Tanda + ditulis langsung di path supaya tidak dikodekan menjadi %2B.
     const res = search.includes('+') && !search.startsWith('+')

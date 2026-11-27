@@ -183,6 +183,9 @@ RekapHarian:
         tidak bisa diganti sesudah `DONE`). Hanya mekanik dengan minimal satu
         SPK selesai. Urut `doneCount` turun, lalu nama naik (collation
         `utf8mb4_0900_ai_ci`), lalu `staffId` naik; baris `mechanic` `null`
-        (SPK selesai tanpa mekanik), bila ada, selalu terakhir.
+        (SPK selesai tanpa mekanik), bila ada, selalu terakhir. Nama
+        mekanik adalah nama **saat ini** (seperti `StafRingkas` di mana
+        pun), juga saat merekap tanggal lampau; urutan nama memakai nama
+        saat ini itu.
       items:
         $ref: '#/SelesaiPerMekanik'

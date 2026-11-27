@@ -121,6 +121,14 @@ async function tanganiKirim({ keadaan, token }: Konteks, req: IncomingMessage, r
   // Dicatat sejak tiba lalu diperbarui di tempat, supaya permintaan yang
   // sedang ditahan jeda sudah terlihat di /__kendali/permintaan.
   keadaan.catat(catatan);
+  // Koneksi yang ditutup pengirim sebelum balasan selesai (batas waktu
+  // backend habis selama jeda) ditandai, supaya pesannya tidak disimpan.
+  let ditinggal = false;
+  res.on('close', () => {
+    if (!res.writableFinished) {
+      ditinggal = true;
+    }
+  });
   const tolak = (alasan: string, reason: string, statusBesar = false) => {
     catatan.hasil = 'ditolak';
     catatan.alasan = alasan;
@@ -175,6 +183,11 @@ async function tanganiKirim({ keadaan, token }: Konteks, req: IncomingMessage, r
   if (jeda > 0) {
     await new Promise((selesai) => setTimeout(selesai, jeda));
   }
+  if (ditinggal) {
+    catatan.hasil = 'ditinggal';
+    catatan.alasan = `pengirim menutup koneksi sebelum jeda ${jeda} ms habis (batas waktu backend?)`;
+    return;
+  }
 
   const gangguan = keadaan.gangguanUntuk(target[0] ?? '');
   if (gangguan) {
@@ -191,6 +204,8 @@ async function tanganiKirim({ keadaan, token }: Konteks, req: IncomingMessage, r
       balasGagal(res, requestid, `gagal kirim: ${'é'.repeat(600)}`);
     } else if (gangguan === 'gema-token') {
       balasGagal(res, requestid, `token tidak dikenali: ${teksHeader(req, 'authorization') ?? ''}`);
+    } else if (gangguan === 'status-besar') {
+      balasGagal(res, requestid, 'device disconnected', true);
     } else {
       balasGagal(res, requestid, 'device disconnected');
     }

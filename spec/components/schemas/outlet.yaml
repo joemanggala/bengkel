@@ -15,7 +15,7 @@ Outlet:
       type: string
     tagline:
       type: string
-      description: Kalimat pendek di bawah nama di halaman depan, mis. "Servis motor dan mobil, cepat dan jujur". Boleh kosong.
+      description: Kalimat pendek di bawah nama di halaman depan, mis. "Servis motor dan mobil, cepat dan jujur". Boleh kosong. Bisa memuat pergantian baris bila pemilik mengetiknya (tidak ditolak).
     address:
       type: string
     phone:
@@ -44,7 +44,11 @@ UbahOutletRequest:
       $ref: './staf.yaml#/Nama'
     tagline:
       type: string
-      description: Dipangkas; boleh kosong. `null` → `required`. Lebih dari 200 karakter → `too_long`.
+      description: |
+        Dipangkas; boleh kosong. `null` → `required`. Lebih dari 200 karakter
+        → `too_long`. Isinya tidak diperiksa lebih jauh (sama dengan `name`):
+        pergantian baris di tengah diterima dan disimpan apa adanya; web
+        menampilkannya sebagai satu kalimat.
       maxLength: 200
     address:
       type: string
@@ -66,9 +70,14 @@ UbahOutletRequest:
       description: |
         Dipangkas; boleh kosong. `null` → `required`. Lebih dari 500 karakter
         → `too_long`. Bila tidak kosong wajib cocok dengan
-        `^https?://[^\s]+$` (diawali `http://` atau `https://` huruf kecil,
-        tanpa spasi atau karakter kontrol di mana pun) → selain itu
-        `invalid_format`. Jadi `javascript:…` dan `www.contoh.id` ditolak.
+        `^https?://[\x21-\x7E]+$`: diawali `http://` atau `https://` huruf
+        kecil, lalu minimal satu karakter dan **hanya karakter ASCII
+        terlihat** U+0021–U+007E. Spasi, tab, CR/LF, NBSP, karakter kontrol,
+        dan semua karakter non-ASCII (huruf beraksen, U+2028, dan
+        sebagainya; tulis dalam bentuk `%XX`) → `invalid_format`. Kelas
+        karakter ditulis dengan rentang kode, bukan `\s` atau `\S`, supaya
+        hasilnya sama di PCRE, JavaScript, dan Go. Jadi `javascript:…` dan
+        `www.contoh.id` ditolak.
       maxLength: 500
     receiptFooter:
       type: string

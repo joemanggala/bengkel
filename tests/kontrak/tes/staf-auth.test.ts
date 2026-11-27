@@ -177,10 +177,11 @@ describe('POST /api/staff/login', () => {
     }
   });
 
-  it('byte UTF-8 tidak sah, surrogat tunggal, atau bersarang lebih dari 64 tingkat → 400, bukan 422 atau 401', async () => {
+  it('byte UTF-8 tidak sah, surrogat tunggal, atau bersarang 65 tingkat → 400, bukan 422 atau 401; 64 tingkat masih dibaca (→ 422)', async () => {
     harapGalat(await api.post('/api/staff/login', { biner: badanUtf8Rusak() }), 400, 'bad_request');
     harapGalat(await api.post('/api/staff/login', { mentah: '{"email":"\\ud800@contoh.id","password":"SandiUji123!"}' }), 400, 'bad_request');
     harapGalat(await api.post('/api/staff/login', { mentah: jsonBersarang(65) }), 400, 'bad_request');
+    harapGalat(await api.post('/api/staff/login', { mentah: jsonBersarang(64) }), 422, 'validation_failed', { email: 'required', password: 'required' });
   });
 
   it('lebih dari 1 MiB → 413, mengalahkan 400 dan 422', async () => {

@@ -16,13 +16,13 @@ import {
   wajib,
   type Bengkel,
 } from '../src/data';
-import { barisBooking, barisItemSpk, barisSpk, barisWaBooking, barisWaSpk, idSpk, jumlahBaris, nilaiPenghitung } from '../src/db';
+import { aturTanggalDatang, barisBooking, barisItemSpk, barisSpk, barisWaBooking, barisWaSpk, idSpk, jumlahBaris, nilaiPenghitung } from '../src/db';
 import { bacaEnv } from '../src/env';
 import { nomorSpk, pesanSpkDibuat, plat, tautanLacak } from '../src/format';
 import { harapGalat, harapStatus } from '../src/galat';
 import { api } from '../src/klien';
 import { waPalsu } from '../src/wa';
-import { jejakKonversi, konversi, lihatBookingPublik, POLA_TOKEN, rincianBooking, variasiHp } from './pembantu-booking';
+import { jejakKonversi, konversi, lihatBookingPublik, POLA_TOKEN, rincianBooking, tanggalWibAman, variasiHp } from './pembantu-booking';
 
 // POST /api/bookings/{bookingId}/convert yang berhasil: booking menjadi SPK,
 // pelanggan dan kendaraan dipakai ulang atau dibuat, jasa booking menjadi item
@@ -122,6 +122,20 @@ describe('booking menjadi SPK', () => {
     expect(workOrder).toMatchObject({ mechanic: { staffId: b.mekanik.staff.staffId, name: b.mekanik.staff.name }, odometer: 18250, complaint: booking.complaint });
     expect(Date.parse(workOrder.estimatedDoneAt)).toBe(Date.parse('2026-12-01T08:00:00.000Z'));
     expect(workOrder.vehicle.vehicleId).not.toBe(b.kendaraan.vehicleId);
+  });
+
+  it('tanggal datang tidak diperiksa saat konversi: booking yang tanggalnya sudah lewat atau masih jauh tetap jadi SPK', async () => {
+    for (const geser of [-10, -1, 45]) {
+      const { bookingId, booking } = await buatBookingPublik();
+      if (geser < 0) {
+        await konfirmasiBooking(b.kasir.token, bookingId);
+      }
+      await aturTanggalDatang(booking.number, await tanggalWibAman(geser));
+
+      const hasil = await jadikan(b.kasir.token, bookingId);
+
+      expect(hasil.booking, `geser ${geser} hari`).toMatchObject({ status: 'CONVERTED', visitDate: await tanggalWibAman(geser) });
+    }
   });
 });
 

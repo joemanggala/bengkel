@@ -20,13 +20,21 @@ login:
          (permintaan serentak tetap hanya mendapat 10 kesempatan), dihitung juga
          untuk email yang tidak terdaftar, dan kuncinya 15 menit sejak
          percobaan ke-10. Login yang berhasil menghapus hitungannya; email
-         lain tidak terpengaruh. Backend yang berjalan sebagai banyak proses
-         (PHP-FPM) menyimpan hitungan di tabel `login_attempts`; backend satu
-         proses boleh menyimpannya di memori.
+         lain tidak terpengaruh. Email yang memuat karakter non-ASCII juga
+         dihitung dan dikunci dengan cara yang sama (kuncinya hash SHA-256
+         email, jadi tidak ada masalah collation). Backend yang berjalan
+         sebagai banyak proses (PHP-FPM) menyimpan hitungan di tabel
+         `login_attempts`; backend satu proses boleh menyimpannya di memori.
+         Hasil beberapa login **bersandi benar** yang dikirim serentak saat
+         hitungan sudah dekat batas (mis. sesudah 9 kali salah, sebagian
+         bisa 200 dan sebagian 429) **tidak ditentukan dan tidak diuji**.
+         Yang diuji untuk serentak hanya percobaan bersandi salah (tepat 10
+         kali 401, sisanya 429).
       4. Email (dipangkas, A-Z dikecilkan) tidak dikenal, sandi salah, atau
          staf nonaktif → 401 `invalid_credentials` dengan badan yang sama
          persis. Email yang memuat karakter non-ASCII pasti tidak terdaftar;
-         backend langsung membalas 401 tanpa bertanya ke database.
+         sesudah langkah 3 (yang tetap menghitungnya), backend langsung
+         membalas 401 tanpa mencari staf di database.
       5. Sesi staf baru dibuat → 200.
 
       Sesi: lihat "Peran dan sesi" di deskripsi API (30 hari, bergeser). Sesi
