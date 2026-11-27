@@ -278,10 +278,10 @@ jadikan SPK), **Pelanggan** (+ kendaraan dan riwayat servis), dan untuk pemilik:
 
 | Bagian | Isi | Selesai bila |
 |---|---|---|
-| 0a. Fondasi | rancangan, spec, migration, docker-compose, panduan menjalankan | migration maju-mundur-maju bersih, spec lolos lint |
-| 0b. Alat uji | tes kontrak, WhatsApp palsu, `docs/eksekusi/` per bagian | harness hijau, tes kontrak lengkap (merah), WA palsu hijau |
-| 1. Backend Laravel | semua rute | tes kontrak hijau (urut dan diacak); PHPUnit dan Pint bersih |
-| 2. Web | website publik dan panel staf | alur booking → SPK → item → selesai → bayar → diambil berjalan melawan Laravel; typecheck, lint, tes hijau |
+| 0a. Fondasi (selesai 2026-11-27) | rancangan, spec (52 operasi), migration (16 tabel), docker-compose, panduan menjalankan | migration maju-mundur-maju bersih; spec lolos lint 0 galat 0 peringatan; 87 pelanggaran ditolak database |
+| 0b. Alat uji (selesai 2026-11-27) | tes kontrak (43 berkas, 2.151 kasus, ditulis lima penulis), WhatsApp palsu (39 tes), perjelasan spec 21 butir | harness hijau, tes kontrak lengkap, WA palsu hijau |
+| 1. Backend Laravel (selesai 2026-11-27) | semua rute | tes kontrak: 2.149 lulus, 2 dilewati (varian setup mati), urut dan diacak (seed 1795761634883), di Nginx + 6 php-cgi; PHPUnit 652 tes, Pint bersih. Backend pertama ini menemukan 4 bug tes, diperbaiki koordinator |
+| 2. Web (selesai 2026-11-27) | website publik dan panel staf | alur booking → konfirmasi → SPK → item → Dikerjakan → Selesai → bayar sebagian lalu lunas → Diambil berjalan di browser melawan Laravel; rekap cocok; typecheck, lint, 288 tes Vitest, `next build` hijau |
 | 3. E2E dan paket | Playwright, ZIP `bengkel-laravel-web-<versi>.zip` | E2E hijau melawan Laravel; ZIP lolos pemeriksa |
 | 4. Panduan Word | empat panduan di `docs/panduan/`, dibuat `alat/panduan-word` | keempatnya terbuka di Word tanpa dialog perbaikan |
 | Menyusul | backend Go, backend NestJS, aplikasi staf Flutter | tes kontrak hijau; paket varian lain |
