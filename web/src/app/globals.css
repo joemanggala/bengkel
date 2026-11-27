@@ -1,0 +1,182 @@
+/*
+ * Copyright (c) 2026 ariefmanggalaputra <idekodecoding@gmail.com>. Hak cipta dilindungi.
+ * Lisensi: lihat berkas LICENSE. Dilarang menjual ulang atau membagikan source code ini.
+ */
+
+@import 'tailwindcss';
+
+/*
+ * Semua warna aplikasi ada di sini. Untuk memakai warna bengkel sendiri, cukup ganti nilai
+ * --color-utama*, lalu jalankan `npm test`: tes kontras (src/tema/__tests__/kontras.test.ts)
+ * memeriksa setiap pasangan teks dan latar tetap memenuhi WCAG AA.
+ *
+ * Temanya sengaja tenang, sama dengan aplikasi lain di seri ini: permukaan putih di atas latar abu
+ * kebiruan tipis, teks hampir hitam, satu warna utama biru tua, dan warna lain hanya untuk makna
+ * (status, galat, berhasil).
+ */
+@theme {
+    /* Permukaan dan teks netral. */
+    --color-latar: #f2f4f6;
+    --color-permukaan: #ffffff;
+    --color-tinta: #16232e;
+    --color-redup: #4a5866;
+    /* Garis pembatas dekoratif (kartu, baris tabel). */
+    --color-garis: #d9dfe5;
+    /* Tepi kotak isian: komponen yang harus dikenali, jadi kontrasnya minimal 3:1. */
+    --color-garis-kuat: #7a8a98;
+
+    /* Warna utama biru tua: tombol utama, menu aktif, tautan. */
+    --color-utama: #1e4a7a;
+    --color-utama-tua: #153a62;
+    --color-utama-pucat: #e3ebf5;
+
+    /* Cincin fokus sengaja jingga, berbeda jauh dari warna utama yang biru, supaya posisi fokus
+       papan ketik tidak tertukar dengan menu yang sedang aktif. */
+    --color-fokus: #c2410c;
+
+    /* Pesan dan aksi berbahaya. */
+    --color-bahaya: #b42323;
+    --color-bahaya-tua: #8f1b1b;
+    --color-bahaya-pucat: #fdeded;
+    --color-peringatan: #6b4104;
+    --color-peringatan-pucat: #fff5df;
+    --color-berhasil: #11592f;
+    --color-berhasil-pucat: #e2f4e9;
+
+    /* Lencana status SPK: teks tua di atas latar pucat dengan rona yang sama. Satu rona per
+       status, berurutan dari biru keabuan (antre) lewat biru (dikerjakan), jingga (menunggu
+       part, perlu perhatian kasir), dan hijau (selesai) sampai abu-abu (diambil); merah untuk
+       dibatalkan. Kolom papan servis jadi mudah dibedakan sekilas. */
+    --color-st-antre: #1f3a5a;
+    --color-st-antre-pucat: #e5ecf4;
+    --color-st-dikerjakan: #124a87;
+    --color-st-dikerjakan-pucat: #dbeafb;
+    --color-st-tunggu-part: #7a4306;
+    --color-st-tunggu-part-pucat: #fbecd2;
+    --color-st-selesai: #11592f;
+    --color-st-selesai-pucat: #d8f1e2;
+    --color-st-diambil: #3b4854;
+    --color-st-diambil-pucat: #eaedf0;
+    --color-st-batal: #981b1b;
+    --color-st-batal-pucat: #fbe4e4;
+
+    /* Lencana status booking: kuning (menunggu konfirmasi staf), biru (dikonfirmasi), hijau
+       (sudah jadi SPK), merah (ditolak staf), dan abu-abu (dibatalkan pelanggan sendiri). */
+    --color-bk-menunggu: #7a4a00;
+    --color-bk-menunggu-pucat: #fff0c2;
+    --color-bk-dikonfirmasi: #124a87;
+    --color-bk-dikonfirmasi-pucat: #dbeafb;
+    --color-bk-jadi-spk: #11592f;
+    --color-bk-jadi-spk-pucat: #d8f1e2;
+    --color-bk-ditolak: #981b1b;
+    --color-bk-ditolak-pucat: #fbe4e4;
+    --color-bk-batal: #3b4854;
+    --color-bk-batal-pucat: #eaedf0;
+
+    /* Huruf sistem: tajam di ponsel Android, iPad, dan Windows, tanpa unduhan font, dan
+       build tetap jalan tanpa internet. */
+    --font-sans:
+        ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue',
+        Arial, sans-serif;
+    --font-mono: ui-monospace, 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+/* Angka uang dibuat sama lebar supaya kolom angka di tabel lurus. */
+@utility angka {
+    font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+        /* Ketukan di layar sentuh tidak memunculkan kotak sorot abu-abu bawaan browser. */
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        background-color: var(--color-latar);
+        color: var(--color-tinta);
+        font-family: var(--font-sans);
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    :focus-visible {
+        outline: 3px solid var(--color-fokus);
+        outline-offset: 2px;
+    }
+
+    ::selection {
+        background-color: var(--color-utama-pucat);
+        color: var(--color-tinta);
+    }
+
+    /* Pengguna yang meminta gerakan dikurangi tidak melihat transisi atau animasi apa pun. */
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        ::before,
+        ::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+}
+
+/*
+ * Cetak: nota SPK untuk printer thermal 58 mm.
+ *
+ * Yang dicetak dirender dua kali: sekali di halaman sebagai pratinjau, sekali lagi lewat portal
+ * di <div id="area-cetak"> langsung di bawah <body> (komponen AreaCetak). Saat mencetak, semua
+ * anak <body> selain area itu disembunyikan dengan display:none, bukan visibility:hidden,
+ * supaya tinggi halaman tidak ikut tercetak sebagai kertas kosong yang panjang.
+ *
+ * Lebar kertas 58 mm, tetapi bidang cetak printer 58 mm umumnya hanya 48 mm. Ukuran kertas
+ * dipilih di dialog cetak (printer thermal biasanya menyediakan "58mm"); @page hanya menghapus
+ * margin, karena `size` CSS tidak mengenal tinggi "otomatis" untuk kertas gulung.
+ */
+#area-cetak {
+    display: none;
+}
+
+@media print {
+    @page {
+        margin: 0;
+    }
+
+    html,
+    body {
+        background: #fff !important;
+    }
+
+    body > :not(#area-cetak) {
+        display: none !important;
+    }
+
+    #area-cetak {
+        display: block;
+    }
+}
+
+.nota-thermal {
+    width: 48mm;
+    margin: 0 auto;
+    padding: 3mm 0 6mm;
+    background: #fff;
+    /* Printer thermal hanya mengenal hitam: abu-abu menjadi titik-titik pudar, jadi semua teks
+       hitam pekat dan ketebalan dipakai sebagai penanda hierarki. */
+    color: #000;
+    font-family: var(--font-sans);
+    font-size: 11px;
+    line-height: 1.35;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    word-break: break-word;
+}
+
+.nota-thermal .garis-putus {
+    border: 0;
+    border-top: 1px dashed #000;
+    margin: 2mm 0;
+}

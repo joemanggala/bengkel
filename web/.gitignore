@@ -1,0 +1,11 @@
+# Hasil build dan cache. .gitignore di akar repo sudah mencakup ini; salinan di sini menjaga
+# folder web/ tetap bersih bila dipakai terpisah.
+.next/
+node_modules/
+*.tsbuildinfo
+next-env.d.ts
+
+# Rahasia lokal. Contohnya ada di .env.example.
+.env
+.env.*
+!.env.example
