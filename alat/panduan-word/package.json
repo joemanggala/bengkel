@@ -1,0 +1,16 @@
+{
+  "name": "panduan-word",
+  "private": true,
+  "description": "Pembuat panduan Word Aplikasi Bengkel di docs/panduan",
+  "scripts": {
+    "buat": "node buat-semua.js",
+    "tangkap": "node tangkap-layar.js"
+  },
+  "dependencies": {
+    "docx": "9.5.1",
+    "jszip": "3.10.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
+  }
+}
